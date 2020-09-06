@@ -8,5 +8,7 @@ func RootCmd() *cobra.Command {
 		Short: "A command line tool for operate Azure DevOps Service",
 	}
 
+	rootCmd.AddCommand(pipelinesCmd)
+
 	return rootCmd
 }
