@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
@@ -17,6 +18,8 @@ var (
 	project             string
 	pipelineID          int
 	runID               int
+	branch              string
+	extraVarPairs       []string
 	personalAccessToken string
 )
 
@@ -33,10 +36,16 @@ func init() {
 	getPipelineRunCmd.Flags().IntVar(&pipelineID, "pipelineid", 0, "pipeline id to retrieve")
 	getPipelineRunCmd.MarkFlagRequired("pipelineid")
 
+	triggerPipelineRunCmd.Flags().IntVar(&pipelineID, "pipelineid", 0, "pipeline id to retrieve")
+	triggerPipelineRunCmd.MarkFlagRequired("pipelineid")
+	triggerPipelineRunCmd.Flags().StringVar(&branch, "branch", "", "The branch to trigger")
+	triggerPipelineRunCmd.Flags().StringSliceVar(&extraVarPairs, "var", []string{}, "extra variables to use")
+
 	pipelinesCmd.AddCommand(listPipelinesCmd)
 	pipelinesCmd.AddCommand(getPipelineCmd)
 	pipelinesCmd.AddCommand(listPipelineRunCmd)
 	pipelinesCmd.AddCommand(getPipelineRunCmd)
+	pipelinesCmd.AddCommand(triggerPipelineRunCmd)
 }
 
 var pipelinesCmd = &cobra.Command{
@@ -209,6 +218,72 @@ var getPipelineRunCmd = &cobra.Command{
 		if err != nil {
 			fmt.Printf("Get pipeline run %d failed for pipeline %d, error: %v", runID, pipelineID, err)
 			return fmt.Errorf("Get pipeline run %d failed for pipeline %d, error: %v", runID, pipelineID, err)
+		}
+
+		run, err := json.Marshal(responseValue)
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+
+		fmt.Printf("%v", string(run))
+
+		return nil
+	},
+}
+
+var triggerPipelineRunCmd = &cobra.Command{
+	Use:   "trigger-run",
+	Short: "Trigger a build for a pipeline",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if personalAccessToken == "" {
+			value, exists := os.LookupEnv("token")
+			if exists == false {
+				return fmt.Errorf("Please set personal access token or specify it in command line")
+			}
+			personalAccessToken = value
+		}
+
+		if branch == "" {
+			branch = "master"
+		}
+
+		variables := map[string]vstspipelines.Variable{}
+		for _, v := range extraVarPairs {
+			parts := strings.SplitN(v, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			variables[key] = vstspipelines.Variable{
+				Value: &value,
+			}
+		}
+
+		organizationURL := fmt.Sprintf("https://dev.azure.com/%s", organization)
+
+		connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+		ctx := context.Background()
+
+		// Create a client to interact with the Pipelines area
+		pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+		responseValue, err := pipelineClient.RunPipeline(ctx, vstspipelines.RunPipelineArgs{
+			Project:    &project,
+			PipelineId: &pipelineID,
+			RunParameters: &vstspipelines.RunPipelineParameters{
+				Resources: &vstspipelines.RunResourcesParameters{
+					Repositories: &map[string]vstspipelines.RepositoryResourceParameters{
+						"self": {
+							RefName: &branch,
+						},
+					},
+				},
+				Variables: &variables,
+			},
+		})
+
+		if err != nil {
+			fmt.Printf("Trigger pipeline run failed for pipeline %d, error: %v", pipelineID, err)
+			return fmt.Errorf("Trigger pipeline run failed for pipeline %d, error: %v", pipelineID, err)
 		}
 
 		run, err := json.Marshal(responseValue)
