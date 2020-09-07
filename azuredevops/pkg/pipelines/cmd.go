@@ -1,0 +1,304 @@
+package pipelines
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
+	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
+	"github.com/spf13/cobra"
+)
+
+const (
+	flagVerbose      = "verbose"
+	flagVerboseShort = "v"
+	flagPatEnvKey    = "pat-env-key"
+	vstsURL          = "https://dev.azure.com/%s"
+)
+
+var (
+	organization string
+	project      string
+	pipelineID   int
+)
+
+// CreateCommand creates a cobra command instance of pipelines.
+func CreateCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "pipeline",
+		Short: "Manage an azure devops pipeline",
+	}
+
+	c.PersistentFlags().StringVar(&organization, "organization", "", "Organization the pipeline belongs to (required)")
+	c.PersistentFlags().StringVar(&project, "project", "", "Project the pipeline belongs to (required)")
+	c.MarkPersistentFlagRequired("organization")
+	c.MarkPersistentFlagRequired("project")
+
+	c.PersistentFlags().String(flagPatEnvKey, "VSTS_PAT", "env variable name for VSTS PAT (personal access token)")
+	c.PersistentFlags().BoolP(flagVerbose, flagVerboseShort, false, "verbose output")
+
+	c.AddCommand(createListPipelinesCommand())
+	c.AddCommand(createGetPipelineCommand())
+	c.AddCommand(createPipelineRunCommand())
+
+	return c
+}
+
+func createListPipelinesCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:          "list",
+		Short:        "list the specified project's pipelines",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+			personalAccessToken := os.Getenv(envKey)
+			if personalAccessToken == "" {
+				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
+			}
+
+			ctx := context.Background()
+
+			organizationURL := fmt.Sprintf(vstsURL, organization)
+
+			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+			// Create a client to interact with the Pipelines area
+			pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+			pipelines, err := pipelineClient.ListPipelines(ctx, vstspipelines.ListPipelinesArgs{
+				Project: &project,
+			})
+
+			if err != nil {
+				return fmt.Errorf("Get pipelines failed for project %s, error: %v", project, err)
+			}
+
+			index := 0
+			if pipelines != nil {
+				for _, pipelineReference := range (*pipelines).Value {
+					fmt.Printf("Id = %v, Name = %v\n", *pipelineReference.Id, *pipelineReference.Name)
+					index++
+				}
+			}
+
+			return nil
+		},
+	}
+	return c
+}
+
+func createGetPipelineCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:          "get [pipelineID]",
+		Short:        "Get detailed information of the specified pipeline",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sourcePipelineID, err := strconv.ParseInt(args[0], 10, 64)
+			pipelineID := int(sourcePipelineID)
+
+			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+			personalAccessToken := os.Getenv(envKey)
+			if personalAccessToken == "" {
+				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
+			}
+
+			ctx := context.Background()
+
+			organizationURL := fmt.Sprintf(vstsURL, organization)
+
+			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+			// Create a client to interact with the Pipelines area
+			pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+			pipeline, err := pipelineClient.GetPipeline(ctx, vstspipelines.GetPipelineArgs{
+				Project:    &project,
+				PipelineId: &pipelineID,
+			})
+
+			if err != nil {
+				return fmt.Errorf("Get pipeline %d failed for project %s, error: %v", pipelineID, project, err)
+			}
+
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", " ")
+			return encoder.Encode(pipeline)
+		},
+	}
+	return c
+}
+
+func createPipelineRunCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "run",
+		Short: "Manage run install of azure devops pipeline",
+	}
+
+	c.PersistentFlags().IntVar(&pipelineID, "pipeline-id", 0, "pipeline id to retrieve")
+	c.MarkPersistentFlagRequired("pipeline-id")
+
+	c.AddCommand(createListPipelineRunCommand())
+	c.AddCommand(createGetPipelineRunCommand())
+	c.AddCommand(createTriggerPipelineRunCommand())
+	return c
+}
+
+func createListPipelineRunCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:          "list",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+			personalAccessToken := os.Getenv(envKey)
+			if personalAccessToken == "" {
+				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
+			}
+
+			ctx := context.Background()
+
+			organizationURL := fmt.Sprintf(vstsURL, organization)
+
+			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+			// Create a client to interact with the Pipelines area
+			pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+			runs, err := pipelineClient.ListRuns(ctx, vstspipelines.ListRunsArgs{
+				Project:    &project,
+				PipelineId: &pipelineID,
+			})
+
+			if err != nil {
+				return fmt.Errorf("Get pipeline runs failed for pipeline %d, error: %v", pipelineID, err)
+			}
+
+			if runs != nil {
+				fmt.Printf("Count = %v\n", len(*runs))
+			}
+
+			return nil
+		},
+	}
+
+	return c
+}
+
+func createGetPipelineRunCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:          "get [build-id]",
+		Short:        "Get detailed information of the specified pipeline run",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sourceRunID, err := strconv.ParseInt(args[0], 10, 64)
+			runID := int(sourceRunID)
+
+			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+			personalAccessToken := os.Getenv(envKey)
+			if personalAccessToken == "" {
+				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
+			}
+
+			ctx := context.Background()
+
+			organizationURL := fmt.Sprintf(vstsURL, organization)
+
+			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+			// Create a client to interact with the Pipelines area
+			pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+			run, err := pipelineClient.GetRun(ctx, vstspipelines.GetRunArgs{
+				Project:    &project,
+				PipelineId: &pipelineID,
+				RunId:      &runID,
+			})
+
+			if err != nil {
+				return fmt.Errorf("Get pipeline run %d failed for pipeline %d, error: %v", runID, pipelineID, err)
+			}
+
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", " ")
+			return encoder.Encode(run)
+		},
+	}
+
+	return c
+}
+
+func createTriggerPipelineRunCommand() *cobra.Command {
+	var (
+		branch        string
+		extraVarPairs []string
+	)
+
+	c := &cobra.Command{
+		Use:          "trigger",
+		Short:        "Trigger a build for a pipeline",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+			personalAccessToken := os.Getenv(envKey)
+			if personalAccessToken == "" {
+				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
+			}
+
+			if branch == "" {
+				branch = "master"
+			}
+
+			variables := map[string]vstspipelines.Variable{}
+			for _, v := range extraVarPairs {
+				parts := strings.SplitN(v, "=", 2)
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				variables[key] = vstspipelines.Variable{
+					Value: &value,
+				}
+			}
+
+			ctx := context.Background()
+
+			organizationURL := fmt.Sprintf(vstsURL, organization)
+
+			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
+
+			// Create a client to interact with the Pipelines area
+			pipelineClient := vstspipelines.NewClient(ctx, connection)
+
+			responseValue, err := pipelineClient.RunPipeline(ctx, vstspipelines.RunPipelineArgs{
+				Project:    &project,
+				PipelineId: &pipelineID,
+				RunParameters: &vstspipelines.RunPipelineParameters{
+					Resources: &vstspipelines.RunResourcesParameters{
+						Repositories: &map[string]vstspipelines.RepositoryResourceParameters{
+							"self": {
+								RefName: &branch,
+							},
+						},
+					},
+					Variables: &variables,
+				},
+			})
+
+			if err != nil {
+				return fmt.Errorf("Trigger pipeline run failed for pipeline %d, error: %v", pipelineID, err)
+			}
+
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", " ")
+			return encoder.Encode(responseValue)
+		},
+	}
+
+	c.Flags().StringVar(&branch, "branch", "", "The branch to trigger")
+	c.Flags().StringSliceVar(&extraVarPairs, "var", []string{}, "extra variables to use")
+
+	return c
+}
