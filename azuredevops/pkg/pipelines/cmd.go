@@ -11,6 +11,7 @@ import (
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/spf13/cobra"
+	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/vstspat"
 )
 
 const (
@@ -25,6 +26,19 @@ var (
 	project      string
 	pipelineID   int
 )
+
+func patEnvProvider(cmd *cobra.Command) (vstspat.PATProvider, error) {
+	envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
+	provider := vstspat.NewPATEnvBackend(envKey)
+	k, err := provider.GetPAT(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("get VSTS PAT from env %s failed: %w", envKey, err)
+	}
+	if k == "" {
+		return nil, fmt.Errorf("empty VSTS PAT from env %s", envKey)
+	}
+	return provider, nil
+}
 
 // CreateCommand creates a cobra command instance of pipelines.
 func CreateCommand() *cobra.Command {
