@@ -75,6 +75,31 @@ func (c *pipelineClient) ListPipelines(ctx context.Context) ([]*vstsbuild.BuildD
 	return result, nil
 }
 
+func (c *pipelineClient) GetPipelineByID(ctx context.Context, id int) (*vstsbuild.BuildDefinition, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "getPipelineByID",
+		"pipeline.id": id,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	build, err := buildClient.GetDefinition(ctx, vstsbuild.GetDefinitionArgs{
+		Project:      &c.project,
+		DefinitionId: &id,
+	})
+	if err != nil {
+		err := fmt.Errorf("get build definition %d: %w", id, err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	return build, nil
+}
+
 func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string) (PipelineClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,

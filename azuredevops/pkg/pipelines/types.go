@@ -10,4 +10,7 @@ import (
 type PipelineClient interface {
 	// ListPipelines lists build pipelines.
 	ListPipelines(ctx context.Context) ([]*vstsbuild.BuildDefinitionReference, error)
+
+	// GetPipelineByID gets a build pipeline by id.
+	GetPipelineByID(ctx context.Context, id int) (*vstsbuild.BuildDefinition, error)
 }

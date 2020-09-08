@@ -112,36 +112,23 @@ func createListPipelinesCommand() *cobra.Command {
 
 func createGetPipelineCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:          "get [pipelineID]",
+		Use:          "show [pipeline-id]",
 		Short:        "Get detailed information of the specified pipeline",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sourcePipelineID, err := strconv.ParseInt(args[0], 10, 64)
-			pipelineID := int(sourcePipelineID)
-
-			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
-			personalAccessToken := os.Getenv(envKey)
-			if personalAccessToken == "" {
-				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
-			}
+			pipelineID, err := strconv.ParseInt(args[0], 10, 64)
 
 			ctx := context.Background()
 
-			organizationURL := fmt.Sprintf(vstsURL, organization)
-
-			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
-
-			// Create a client to interact with the Pipelines area
-			pipelineClient := vstspipelines.NewClient(ctx, connection)
-
-			pipeline, err := pipelineClient.GetPipeline(ctx, vstspipelines.GetPipelineArgs{
-				Project:    &project,
-				PipelineId: &pipelineID,
-			})
-
+			pipelineClient, err := pipelineClientForCommandLine(cmd)
 			if err != nil {
-				return fmt.Errorf("Get pipeline %d failed for project %s, error: %v", pipelineID, project, err)
+				return err
+			}
+
+			pipeline, err := pipelineClient.GetPipelineByID(ctx, int(pipelineID))
+			if err != nil {
+				return err
 			}
 
 			encoder := json.NewEncoder(cmd.OutOrStdout())
