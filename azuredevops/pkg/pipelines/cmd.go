@@ -167,8 +167,9 @@ func createListPipelineBuildsCommand() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("count=", len(builds))
-			return nil
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", " ")
+			return encoder.Encode(builds)
 		},
 	}
 
