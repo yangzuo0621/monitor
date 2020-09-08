@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
-	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
-	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/vstspat"
@@ -196,7 +192,6 @@ func createGetPipelineRunCommand() *cobra.Command {
 			}
 
 			build, err := pipelineClient.GetPipelineBuildByID(ctx, int(buildID))
-
 			if err != nil {
 				return err
 			}
@@ -217,61 +212,25 @@ func createTriggerPipelineRunCommand() *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:          "trigger",
+		Use:          "create",
 		Short:        "Trigger a build for a pipeline",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
-			personalAccessToken := os.Getenv(envKey)
-			if personalAccessToken == "" {
-				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
-			}
-
-			if branch == "" {
-				branch = "master"
-			}
-
-			variables := map[string]vstspipelines.Variable{}
-			for _, v := range extraVarPairs {
-				parts := strings.SplitN(v, "=", 2)
-				key := strings.TrimSpace(parts[0])
-				value := strings.TrimSpace(parts[1])
-				variables[key] = vstspipelines.Variable{
-					Value: &value,
-				}
-			}
-
 			ctx := context.Background()
 
-			organizationURL := fmt.Sprintf(vstsURL, organization)
-
-			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
-
-			// Create a client to interact with the Pipelines area
-			pipelineClient := vstspipelines.NewClient(ctx, connection)
-
-			responseValue, err := pipelineClient.RunPipeline(ctx, vstspipelines.RunPipelineArgs{
-				Project:    &project,
-				PipelineId: &pipelineID,
-				RunParameters: &vstspipelines.RunPipelineParameters{
-					Resources: &vstspipelines.RunResourcesParameters{
-						Repositories: &map[string]vstspipelines.RepositoryResourceParameters{
-							"self": {
-								RefName: &branch,
-							},
-						},
-					},
-					Variables: &variables,
-				},
-			})
-
+			pipelineClient, err := pipelineClientForCommandLine(cmd)
 			if err != nil {
-				return fmt.Errorf("Trigger pipeline run failed for pipeline %d, error: %v", pipelineID, err)
+				return err
+			}
+
+			run, err := pipelineClient.TriggerPipelineBuild(ctx, branch, extraVarPairs)
+			if err != nil {
+				return err
 			}
 
 			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", " ")
-			return encoder.Encode(responseValue)
+			return encoder.Encode(run)
 		},
 	}
 

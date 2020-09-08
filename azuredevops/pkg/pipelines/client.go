@@ -3,9 +3,11 @@ package pipelines
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
+	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/sirupsen/logrus"
 	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/vstspat"
 )
@@ -43,6 +45,16 @@ func (c *pipelineClient) buildClient(ctx context.Context) (vstsbuild.Client, err
 		return nil, fmt.Errorf("new policy client: %w", err)
 	}
 
+	return client, nil
+}
+
+func (c *pipelineClient) pipelineClient(ctx context.Context) (vstspipelines.Client, error) {
+	connection, err := c.patTokenConn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("acquire pat connection: %w", err)
+	}
+
+	client := vstspipelines.NewClient(ctx, connection)
 	return client, nil
 }
 
@@ -158,6 +170,56 @@ func (c *pipelineClient) GetPipelineBuildByID(ctx context.Context, id int) (*vst
 	}
 
 	return build, nil
+}
+
+func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string, variables []string) (*vstspipelines.Run, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "listPipelineBuilds",
+		"pipeline.id": c.pipelineID,
+	})
+
+	pipelineClient, err := c.pipelineClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	if branch == "" {
+		branch = "master"
+	}
+
+	vars := map[string]vstspipelines.Variable{}
+	for _, v := range variables {
+		parts := strings.SplitN(v, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		vars[key] = vstspipelines.Variable{
+			Value: &value,
+		}
+	}
+
+	resp, err := pipelineClient.RunPipeline(ctx, vstspipelines.RunPipelineArgs{
+		Project:    &c.project,
+		PipelineId: &c.pipelineID,
+		RunParameters: &vstspipelines.RunPipelineParameters{
+			Resources: &vstspipelines.RunResourcesParameters{
+				Repositories: &map[string]vstspipelines.RepositoryResourceParameters{
+					"self": {
+						RefName: &branch,
+					},
+				},
+			},
+			Variables: &vars,
+		},
+	})
+
+	if err != nil {
+		err = fmt.Errorf("trigger pipeline %d failed: %w", c.pipelineID, err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {

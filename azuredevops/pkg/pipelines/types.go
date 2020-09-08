@@ -4,6 +4,7 @@ import (
 	"context"
 
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
+	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 )
 
 // PipelineClient interface for managing azure devops pipelines
@@ -19,4 +20,7 @@ type PipelineClient interface {
 
 	// GetPipelineBuildByID gets a build of pipeline by id
 	GetPipelineBuildByID(ctx context.Context, id int) (*vstsbuild.Build, error)
+
+	// TriggerPipelineBuild creates a build intance of specified pipeline.
+	TriggerPipelineBuild(ctx context.Context, branch string, variables []string) (*vstspipelines.Run, error)
 }
