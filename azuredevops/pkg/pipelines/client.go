@@ -16,6 +16,7 @@ type pipelineClient struct {
 	patProvider  vstspat.PATProvider
 	organization string
 	project      string
+	pipelineID   int
 
 	logger logrus.FieldLogger
 }
@@ -87,7 +88,7 @@ func (c *pipelineClient) GetPipelineByID(ctx context.Context, id int) (*vstsbuil
 		return nil, err
 	}
 
-	build, err := buildClient.GetDefinition(ctx, vstsbuild.GetDefinitionArgs{
+	pipeline, err := buildClient.GetDefinition(ctx, vstsbuild.GetDefinitionArgs{
 		Project:      &c.project,
 		DefinitionId: &id,
 	})
@@ -97,10 +98,69 @@ func (c *pipelineClient) GetPipelineByID(ctx context.Context, id int) (*vstsbuil
 		return nil, err
 	}
 
+	return pipeline, nil
+}
+
+func (c *pipelineClient) ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.Build, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "listPipelineBuilds",
+		"pipeline.id": c.pipelineID,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	resp, err := buildClient.GetBuilds(ctx, vstsbuild.GetBuildsArgs{
+		Project:     &c.project,
+		Definitions: &[]int{c.pipelineID},
+	})
+
+	if err != nil {
+		err = fmt.Errorf("get builds failed: %w", err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	var result []*vstsbuild.Build
+	for _, v := range resp.Value {
+		value := v
+		result = append(result, &value)
+	}
+
+	return result, nil
+}
+
+func (c *pipelineClient) GetPipelineBuildByID(ctx context.Context, id int) (*vstsbuild.Build, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "listPipelineBuilds",
+		"pipeline.id": c.pipelineID,
+		"build.id":    id,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	build, err := buildClient.GetBuild(ctx, vstsbuild.GetBuildArgs{
+		Project: &c.project,
+		BuildId: &id,
+	})
+
+	if err != nil {
+		err = fmt.Errorf("get build %d failed: %w", id, err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
 	return build, nil
 }
 
-func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string) (PipelineClient, error) {
+func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,
 		"project":      project,
@@ -110,6 +170,7 @@ func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATPro
 		patProvider:  patProvider,
 		organization: org,
 		project:      project,
+		pipelineID:   pipelineID,
 		logger:       logger,
 	}, nil
 }
