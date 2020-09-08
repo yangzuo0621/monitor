@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
@@ -125,9 +126,16 @@ func (c *pipelineClient) ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.B
 		return nil, err
 	}
 
+	i := 10
+	now := time.Now().UTC()
+	yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, time.UTC)
 	resp, err := buildClient.GetBuilds(ctx, vstsbuild.GetBuildsArgs{
 		Project:     &c.project,
 		Definitions: &[]int{c.pipelineID},
+		MinTime:     &vsts.Time{Time: yesterday},
+		// MaxTime:      &vsts.Time{Time: time.Now()},
+		Top:          &i,
+		ResultFilter: &vstsbuild.BuildResultValues.Succeeded,
 	})
 
 	if err != nil {
