@@ -10,6 +10,7 @@ import (
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/vstspat"
 )
@@ -40,6 +41,26 @@ func patEnvProvider(cmd *cobra.Command) (vstspat.PATProvider, error) {
 	return provider, nil
 }
 
+func cmdLogger(cmd *cobra.Command) *logrus.Logger {
+	logger := logrus.New()
+	verbose, _ := cmd.Flags().GetBool(flagVerbose)
+	if verbose {
+		logger.SetLevel(logrus.DebugLevel)
+	}
+	return logger
+}
+
+func pipelineClientForCommandLine(cmd *cobra.Command) (PipelineClient, error) {
+	logger := cmdLogger(cmd)
+
+	patProvider, err := patEnvProvider(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	return newPipelineClient(logger, patProvider, organization, project)
+}
+
 // CreateCommand creates a cobra command instance of pipelines.
 func CreateCommand() *cobra.Command {
 	c := &cobra.Command{
@@ -68,38 +89,22 @@ func createListPipelinesCommand() *cobra.Command {
 		Short:        "list the specified project's pipelines",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			envKey, _ := cmd.Flags().GetString(flagPatEnvKey)
-			personalAccessToken := os.Getenv(envKey)
-			if personalAccessToken == "" {
-				return fmt.Errorf("empty VSTS PAT from env %s", envKey)
-			}
-
 			ctx := context.Background()
 
-			organizationURL := fmt.Sprintf(vstsURL, organization)
+			pipelineClient, err := pipelineClientForCommandLine(cmd)
+			if err != nil {
+				return err
+			}
 
-			connection := vsts.NewPatConnection(organizationURL, personalAccessToken)
-
-			// Create a client to interact with the Pipelines area
-			pipelineClient := vstspipelines.NewClient(ctx, connection)
-
-			pipelines, err := pipelineClient.ListPipelines(ctx, vstspipelines.ListPipelinesArgs{
-				Project: &project,
-			})
+			pipelines, err := pipelineClient.ListPipelines(ctx)
 
 			if err != nil {
-				return fmt.Errorf("Get pipelines failed for project %s, error: %v", project, err)
+				return err
 			}
 
-			index := 0
-			if pipelines != nil {
-				for _, pipelineReference := range (*pipelines).Value {
-					fmt.Printf("Id = %v, Name = %v\n", *pipelineReference.Id, *pipelineReference.Name)
-					index++
-				}
-			}
-
-			return nil
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", " ")
+			return encoder.Encode(pipelines)
 		},
 	}
 	return c
