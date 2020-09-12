@@ -13,4 +13,7 @@ type GitClient interface {
 
 	// GetGitRepository get git repository
 	GetGitRepository(ctx context.Context) (*vstsgit.GitRepository, error)
+
+	// CloneRepository clones a repository
+	CloneRepository(ctx context.Context, workdir string, repoName string) error
 }

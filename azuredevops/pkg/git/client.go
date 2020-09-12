@@ -2,7 +2,10 @@ package git
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsgit "github.com/microsoft/azure-devops-go-api/azuredevops/git"
@@ -10,7 +13,10 @@ import (
 	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/vstspat"
 )
 
-const vstsResourceURL = "https://dev.azure.com/%s"
+const (
+	vstsResourceURL = "https://dev.azure.com/%s"
+	gitRepoFormat   = "https://dev.azure.com/%s/%s/_git/%s"
+)
 
 type gitClient struct {
 	patProvider  vstspat.PATProvider
@@ -104,6 +110,28 @@ func (c *gitClient) GetGitRepository(ctx context.Context) (*vstsgit.GitRepositor
 	}
 
 	return repo, nil
+}
+
+func (c *gitClient) CloneRepository(ctx context.Context, workdir string, repoName string) error {
+	pat, err := c.patProvider.GetPAT(ctx)
+	if err != nil {
+		return fmt.Errorf("get PAT: %w", err)
+	}
+
+	auth := fmt.Sprintf(":%s", pat)
+	authBase64Token := base64.StdEncoding.EncodeToString([]byte(auth))
+	gitRepo := fmt.Sprintf(gitRepoFormat, c.organization, c.project, repoName)
+	gitCmd := exec.Command("git", "-c", fmt.Sprintf(`http.extraHeader=Authorization: Basic %s`, authBase64Token), "clone", gitRepo)
+
+	gitCmd.Dir = workdir
+	gitCmd.Stdout = os.Stdout
+	gitCmd.Stderr = os.Stderr
+
+	if err := gitCmd.Run(); err != nil {
+		return fmt.Errorf("Clone repo %s: %v", repoName, err)
+	}
+
+	return nil
 }
 
 func newGitClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, repositoryID string) (GitClient, error) {

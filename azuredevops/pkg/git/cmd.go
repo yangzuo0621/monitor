@@ -74,6 +74,7 @@ func CreateCommand() *cobra.Command {
 
 	c.AddCommand(createGitPushCommand())
 	c.AddCommand(createGetGitRepositoryCommand())
+	c.AddCommand(createCloneGitRepositoryCommand())
 	return c
 }
 
@@ -111,7 +112,7 @@ func createGitPushCommand() *cobra.Command {
 func createGetGitRepositoryCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:          "get",
-		Short:        "create a new branch from commit",
+		Short:        "get a git repository",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
@@ -136,5 +137,35 @@ func createGetGitRepositoryCommand() *cobra.Command {
 	c.Flags().StringVar(&respositoryID, "respository", "", "repository name or id (required)")
 	c.MarkFlagRequired("respository")
 
+	return c
+}
+
+func createCloneGitRepositoryCommand() *cobra.Command {
+	var (
+		repoName string
+		repoPath string
+	)
+	c := &cobra.Command{
+		Use:          "clone",
+		Short:        "clone git repository",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			client, err := gitClientForCommandLine(cmd)
+			if err != nil {
+				return err
+			}
+
+			if repoPath == "" {
+				repoPath = "./"
+			}
+
+			return client.CloneRepository(ctx, repoPath, repoName)
+		},
+	}
+
+	c.Flags().StringVar(&repoName, "repo", "", "repository name (required)")
+	c.Flags().StringVar(&repoPath, "path", "", "repository root path")
+	c.MarkFlagRequired("repo")
 	return c
 }
