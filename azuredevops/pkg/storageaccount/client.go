@@ -1,6 +1,7 @@
 package storageaccount
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -132,4 +133,15 @@ func (c *Client) GetBlob(containerName string, blobName string) (string, error) 
 	defer resp.Response().Body.Close()
 	body, err := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	return string(body), err
+}
+
+func (c *Client) UploadBlob(containerName string, blobName string) (int, error) {
+	b := c.getBlobURL(containerName, blobName)
+
+	resp, err := b.ToBlockBlobURL().Upload(context.Background(), bytes.NewReader([]byte("ABCDDD")), azblob.BlobHTTPHeaders{}, azblob.Metadata{}, azblob.BlobAccessConditions{})
+	if err != nil {
+		return 0, err
+	}
+
+	return resp.StatusCode(), nil
 }
