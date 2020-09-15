@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"path"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -43,25 +41,18 @@ func Environment() (*azure.Environment, error) {
 }
 
 // GetAzureKeyVaultAuthorizer constructs authorizer for storage account
-func (c *Client) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
+func (c *Client) GetAzureStorageAccountAuthorizer() (autorest.Authorizer, error) {
 	cloudEnv, err := Environment()
 	if err != nil {
 		return nil, err
 	}
-	alternateEndpoint, err := url.Parse(cloudEnv.ActiveDirectoryEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	alternateEndpoint.Path = path.Join(c.TenantID, "/oauth2/token")
 
 	oauthConfig, err := adal.NewOAuthConfig(cloudEnv.ActiveDirectoryEndpoint, c.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("create OAuth config failed")
 	}
-	oauthConfig.AuthorizeEndpoint = *alternateEndpoint
 
-	vaultEndpoint := strings.TrimSuffix(cloudEnv.KeyVaultEndpoint, "/")
-	token, err := adal.NewServicePrincipalToken(*oauthConfig, c.ClientID, c.ClientSecret, vaultEndpoint)
+	token, err := adal.NewServicePrincipalToken(*oauthConfig, c.ClientID, c.ClientSecret, cloudEnv.ResourceManagerEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("create service principal token failed: %w", err)
 	}
@@ -72,7 +63,7 @@ func (c *Client) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
 // GetStorageAccountClient creates a storage account client
 func (c *Client) GetStorageAccountClient() (*storage.AccountsClient, error) {
 	storageAccountsClient := storage.NewAccountsClient(c.SubscriptionID)
-	auth, err := c.GetAzureKeyVaultAuthorizer()
+	auth, err := c.GetAzureStorageAccountAuthorizer()
 	if err != nil {
 		return nil, err
 	}
