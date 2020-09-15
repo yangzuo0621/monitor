@@ -3,6 +3,7 @@ package storageaccount
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 
@@ -113,4 +114,22 @@ func (c *Client) CreateContainer(containerName string) (azblob.ContainerURL, err
 		azblob.Metadata{},
 		azblob.PublicAccessContainer)
 	return container, err
+}
+
+func (c *Client) getBlobURL(containerName string, blobName string) azblob.BlobURL {
+	container := c.GetContainerURL(containerName)
+	blob := container.NewBlobURL(blobName)
+	return blob
+}
+
+func (c *Client) GetBlob(containerName string, blobName string) (string, error) {
+	b := c.getBlobURL(containerName, blobName)
+
+	resp, err := b.Download(context.Background(), 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Response().Body.Close()
+	body, err := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	return string(body), err
 }
