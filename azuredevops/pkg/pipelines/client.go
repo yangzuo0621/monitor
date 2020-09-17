@@ -230,7 +230,7 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string
 	return resp, nil
 }
 
-func newPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {
+func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,
 		"project":      project,

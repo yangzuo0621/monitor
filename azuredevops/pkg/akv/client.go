@@ -19,7 +19,10 @@ type akvClient struct {
 	vaultName    string
 }
 
-const vaultURL = "https://%s.vault.azure.net"
+const (
+	vaultURL = "https://%s.vault.azure.net"
+	patKey   = "VSTSPAT"
+)
 
 // BuildAKVClient build a AKV client instance
 func BuildAKVClient(clientID string, tenantID string, clientSecret string, vaultName string) AKVClient {
@@ -73,6 +76,11 @@ func (c *akvClient) GetSecretFromAzureKeyVault(ctx context.Context, secretName s
 	}
 
 	return secret.Value, nil
+}
+
+func (c *akvClient) GetPAT(ctx context.Context) (string, error) {
+	pat, err := c.GetSecretFromAzureKeyVault(ctx, patKey)
+	return *pat, err
 }
 
 var _ AKVClient = (*akvClient)(nil)

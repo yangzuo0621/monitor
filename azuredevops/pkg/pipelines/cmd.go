@@ -54,7 +54,7 @@ func pipelineClientForCommandLine(cmd *cobra.Command) (PipelineClient, error) {
 		return nil, err
 	}
 
-	return newPipelineClient(logger, patProvider, organization, project, pipelineID)
+	return BuildPipelineClient(logger, patProvider, organization, project, pipelineID)
 }
 
 // CreateCommand creates a cobra command instance of pipelines.
