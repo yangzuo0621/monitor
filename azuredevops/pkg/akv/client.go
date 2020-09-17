@@ -16,16 +16,18 @@ type akvClient struct {
 	clientID     string
 	tenantID     string
 	clientSecret string
+	vaultName    string
 }
 
 const vaultURL = "https://%s.vault.azure.net"
 
 // BuildAKVClient build a AKV client instance
-func BuildAKVClient(clientID string, tenantID string, clientSecret string) AKVClient {
+func BuildAKVClient(clientID string, tenantID string, clientSecret string, vaultName string) AKVClient {
 	return &akvClient{
 		clientID:     clientID,
 		tenantID:     tenantID,
 		clientSecret: clientSecret,
+		vaultName:    vaultName,
 	}
 }
 
@@ -56,7 +58,7 @@ func (c *akvClient) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
 	return autorest.NewBearerAuthorizer(token), nil
 }
 
-func (c *akvClient) GetSecretFromAzureKeyVault(ctx context.Context, vaultName string, secretName string) (*string, error) {
+func (c *akvClient) GetSecretFromAzureKeyVault(ctx context.Context, secretName string) (*string, error) {
 	authorizer, err := c.GetAzureKeyVaultAuthorizer()
 	if err != nil {
 		return nil, err
@@ -65,7 +67,7 @@ func (c *akvClient) GetSecretFromAzureKeyVault(ctx context.Context, vaultName st
 	kvClient := keyvault.New()
 	kvClient.Authorizer = authorizer
 
-	secret, err := kvClient.GetSecret(ctx, fmt.Sprintf(vaultURL, vaultName), secretName, "")
+	secret, err := kvClient.GetSecret(ctx, fmt.Sprintf(vaultURL, c.vaultName), secretName, "")
 	if err != nil {
 		return nil, err
 	}

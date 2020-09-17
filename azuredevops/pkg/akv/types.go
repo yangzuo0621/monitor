@@ -12,5 +12,5 @@ type AKVClient interface {
 	GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error)
 
 	// GetSecretFromAzureKeyVault return the secret value of secret name from AKV
-	GetSecretFromAzureKeyVault(ctx context.Context, vaultName string, secretName string) (*string, error)
+	GetSecretFromAzureKeyVault(ctx context.Context, secretName string) (*string, error)
 }
