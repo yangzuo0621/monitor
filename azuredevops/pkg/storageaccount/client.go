@@ -73,25 +73,25 @@ func (c *Client) GetStorageAccountClient() (*storage.AccountsClient, error) {
 	return &storageAccountsClient, nil
 }
 
-func (c *Client) GetAccountKeys() (*storage.AccountListKeysResult, error) {
+func (c *Client) GetAccountKeys(ctx context.Context) (*storage.AccountListKeysResult, error) {
 	accountsClient, err := c.GetStorageAccountClient()
 	if err != nil {
 		return nil, err
 	}
-	result, err := accountsClient.ListKeys(context.Background(), c.ResourceGroup, c.AccountName)
+	result, err := accountsClient.ListKeys(ctx, c.ResourceGroup, c.AccountName)
 	return &result, err
 }
 
-func (c *Client) GetAccountPrimaryKey() string {
-	response, err := c.GetAccountKeys()
+func (c *Client) GetAccountPrimaryKey(ctx context.Context) string {
+	response, err := c.GetAccountKeys(ctx)
 	if err != nil {
 		log.Fatalf("failed to list keys: %v", err)
 	}
 	return *(((*response.Keys)[0]).Value)
 }
 
-func (c *Client) GetContainerURL(containerName string) azblob.ContainerURL {
-	key := c.GetAccountPrimaryKey()
+func (c *Client) GetContainerURL(ctx context.Context, containerName string) azblob.ContainerURL {
+	key := c.GetAccountPrimaryKey(ctx)
 	cred, _ := azblob.NewSharedKeyCredential(c.AccountName, key)
 	p := azblob.NewPipeline(cred, azblob.PipelineOptions{})
 	u, _ := url.Parse(fmt.Sprintf(blobFormatString, c.AccountName))
@@ -100,33 +100,42 @@ func (c *Client) GetContainerURL(containerName string) azblob.ContainerURL {
 	return container
 }
 
-func (c *Client) GetContainer(containerName string) (azblob.ContainerURL, error) {
-	container := c.GetContainerURL(containerName)
+func (c *Client) GetContainerURLFromAccessKey(ctx context.Context, containerName string, accessKey string) azblob.ContainerURL {
+	cred, _ := azblob.NewSharedKeyCredential(c.AccountName, accessKey)
+	p := azblob.NewPipeline(cred, azblob.PipelineOptions{})
+	u, _ := url.Parse(fmt.Sprintf(blobFormatString, c.AccountName))
+	service := azblob.NewServiceURL(*u, p)
+	container := service.NewContainerURL(containerName)
+	return container
+}
 
-	_, err := container.GetProperties(context.Background(), azblob.LeaseAccessConditions{})
+func (c *Client) GetContainer(ctx context.Context, containerName string) (azblob.ContainerURL, error) {
+	container := c.GetContainerURL(ctx, containerName)
+
+	_, err := container.GetProperties(ctx, azblob.LeaseAccessConditions{})
 	return container, err
 }
 
-func (c *Client) CreateContainer(containerName string) (azblob.ContainerURL, error) {
-	container := c.GetContainerURL(containerName)
+func (c *Client) CreateContainer(ctx context.Context, containerName string) (azblob.ContainerURL, error) {
+	container := c.GetContainerURL(ctx, containerName)
 
 	_, err := container.Create(
-		context.Background(),
+		ctx,
 		azblob.Metadata{},
 		azblob.PublicAccessContainer)
 	return container, err
 }
 
-func (c *Client) getBlobURL(containerName string, blobName string) azblob.BlobURL {
-	container := c.GetContainerURL(containerName)
+func (c *Client) getBlobURL(ctx context.Context, containerName string, blobName string) azblob.BlobURL {
+	container := c.GetContainerURL(ctx, containerName)
 	blob := container.NewBlobURL(blobName)
 	return blob
 }
 
-func (c *Client) GetBlob(containerName string, blobName string) (string, error) {
-	b := c.getBlobURL(containerName, blobName)
+func (c *Client) GetBlob(ctx context.Context, containerName string, blobName string) (string, error) {
+	b := c.getBlobURL(ctx, containerName, blobName)
 
-	resp, err := b.Download(context.Background(), 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false)
+	resp, err := b.Download(ctx, 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false)
 	if err != nil {
 		return "", err
 	}
@@ -135,10 +144,10 @@ func (c *Client) GetBlob(containerName string, blobName string) (string, error) 
 	return string(body), err
 }
 
-func (c *Client) UploadBlob(containerName string, blobName string) (int, error) {
-	b := c.getBlobURL(containerName, blobName)
+func (c *Client) UploadBlob(ctx context.Context, containerName string, blobName string, content string) (int, error) {
+	b := c.getBlobURL(ctx, containerName, blobName)
 
-	resp, err := b.ToBlockBlobURL().Upload(context.Background(), bytes.NewReader([]byte("ABCDDD")), azblob.BlobHTTPHeaders{}, azblob.Metadata{}, azblob.BlobAccessConditions{})
+	resp, err := b.ToBlockBlobURL().Upload(ctx, bytes.NewReader([]byte(content)), azblob.BlobHTTPHeaders{}, azblob.Metadata{}, azblob.BlobAccessConditions{})
 	if err != nil {
 		return 0, err
 	}
