@@ -20,7 +20,6 @@ type pipelineClient struct {
 	patProvider  vstspat.PATProvider
 	organization string
 	project      string
-	pipelineID   int
 
 	logger logrus.FieldLogger
 }
@@ -115,10 +114,10 @@ func (c *pipelineClient) GetPipelineByID(ctx context.Context, id int) (*vstsbuil
 	return pipeline, nil
 }
 
-func (c *pipelineClient) ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.Build, error) {
+func (c *pipelineClient) ListPipelineBuilds(ctx context.Context, pipelineID int) ([]*vstsbuild.Build, error) {
 	logger := c.logger.WithFields(logrus.Fields{
 		"action":      "listPipelineBuilds",
-		"pipeline.id": c.pipelineID,
+		"pipeline.id": pipelineID,
 	})
 
 	buildClient, err := c.buildClient(ctx)
@@ -132,7 +131,7 @@ func (c *pipelineClient) ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.B
 	yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, time.UTC)
 	resp, err := buildClient.GetBuilds(ctx, vstsbuild.GetBuildsArgs{
 		Project:     &c.project,
-		Definitions: &[]int{c.pipelineID},
+		Definitions: &[]int{pipelineID},
 		MinTime:     &vsts.Time{Time: yesterday},
 		// MaxTime:      &vsts.Time{Time: time.Now()},
 		Top:          &i,
@@ -156,9 +155,8 @@ func (c *pipelineClient) ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.B
 
 func (c *pipelineClient) GetPipelineBuildByID(ctx context.Context, id int) (*vstsbuild.Build, error) {
 	logger := c.logger.WithFields(logrus.Fields{
-		"action":      "listPipelineBuilds",
-		"pipeline.id": c.pipelineID,
-		"build.id":    id,
+		"action":   "listPipelineBuilds",
+		"build.id": id,
 	})
 
 	buildClient, err := c.buildClient(ctx)
@@ -181,10 +179,10 @@ func (c *pipelineClient) GetPipelineBuildByID(ctx context.Context, id int) (*vst
 	return build, nil
 }
 
-func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string, variables []string) (*vstspipelines.Run, error) {
+func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, pipelineID int, branch string, variables []string) (*vstspipelines.Run, error) {
 	logger := c.logger.WithFields(logrus.Fields{
 		"action":      "listPipelineBuilds",
-		"pipeline.id": c.pipelineID,
+		"pipeline.id": pipelineID,
 	})
 
 	pipelineClient, err := c.pipelineClient(ctx)
@@ -209,7 +207,7 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string
 
 	resp, err := pipelineClient.RunPipeline(ctx, vstspipelines.RunPipelineArgs{
 		Project:    &c.project,
-		PipelineId: &c.pipelineID,
+		PipelineId: &pipelineID,
 		RunParameters: &vstspipelines.RunPipelineParameters{
 			Resources: &vstspipelines.RunResourcesParameters{
 				Repositories: &map[string]vstspipelines.RepositoryResourceParameters{
@@ -223,7 +221,7 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string
 	})
 
 	if err != nil {
-		err = fmt.Errorf("trigger pipeline %d failed: %w", c.pipelineID, err)
+		err = fmt.Errorf("trigger pipeline %d failed: %w", pipelineID, err)
 		logger.WithError(err).Error()
 		return nil, err
 	}
@@ -231,10 +229,10 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string
 	return resp, nil
 }
 
-func (c *pipelineClient) QueueBuild(ctx context.Context, branch string, commitID string, variables []string) (*vstsbuild.Build, error) {
+func (c *pipelineClient) QueueBuild(ctx context.Context, pipelineID int, branch string, commitID string, variables map[string]string) (*vstsbuild.Build, error) {
 	logger := c.logger.WithFields(logrus.Fields{
 		"action":      "QueueBuild",
-		"pipeline.id": c.pipelineID,
+		"pipeline.id": pipelineID,
 	})
 
 	buildClient, err := c.buildClient(ctx)
@@ -247,23 +245,13 @@ func (c *pipelineClient) QueueBuild(ctx context.Context, branch string, commitID
 		branch = "refs/heads/master"
 	}
 
-	vars := map[string]vstspipelines.Variable{}
-	for _, v := range variables {
-		parts := strings.SplitN(v, "=", 2)
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		vars[key] = vstspipelines.Variable{
-			Value: &value,
-		}
-	}
-
-	content, _ := json.Marshal(vars)
+	content, _ := json.Marshal(variables)
 	contentStr := string(content)
 
 	build, err := buildClient.QueueBuild(ctx, vstsbuild.QueueBuildArgs{
 		Build: &vstsbuild.Build{
 			Definition: &vstsbuild.DefinitionReference{
-				Id: &c.pipelineID,
+				Id: &pipelineID,
 			},
 			SourceBranch:  &branch,
 			SourceVersion: &commitID,
@@ -280,7 +268,7 @@ func (c *pipelineClient) QueueBuild(ctx context.Context, branch string, commitID
 	return build, nil
 }
 
-func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {
+func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string) (PipelineClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,
 		"project":      project,
@@ -290,7 +278,6 @@ func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATP
 		patProvider:  patProvider,
 		organization: org,
 		project:      project,
-		pipelineID:   pipelineID,
 		logger:       logger,
 	}, nil
 }

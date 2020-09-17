@@ -16,14 +16,14 @@ type PipelineClient interface {
 	GetPipelineByID(ctx context.Context, id int) (*vstsbuild.BuildDefinition, error)
 
 	// ListPipelineBuilds lists builds of pipeline.
-	ListPipelineBuilds(ctx context.Context) ([]*vstsbuild.Build, error)
+	ListPipelineBuilds(ctx context.Context, pipelineID int) ([]*vstsbuild.Build, error)
 
 	// GetPipelineBuildByID gets a build of pipeline by id
 	GetPipelineBuildByID(ctx context.Context, id int) (*vstsbuild.Build, error)
 
 	// TriggerPipelineBuild creates a build intance of specified pipeline.
-	TriggerPipelineBuild(ctx context.Context, branch string, variables []string) (*vstspipelines.Run, error)
+	TriggerPipelineBuild(ctx context.Context, pipelineID int, branch string, variables []string) (*vstspipelines.Run, error)
 
 	// QueueBuild creates a build instance of specified pipeline.
-	QueueBuild(ctx context.Context, branch string, commitID string, variables []string) (*vstsbuild.Build, error)
+	QueueBuild(ctx context.Context, pipelineID int, branch string, commitID string, variables map[string]string) (*vstsbuild.Build, error)
 }

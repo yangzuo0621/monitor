@@ -54,7 +54,7 @@ func pipelineClientForCommandLine(cmd *cobra.Command) (PipelineClient, error) {
 		return nil, err
 	}
 
-	return BuildPipelineClient(logger, patProvider, organization, project, pipelineID)
+	return BuildPipelineClient(logger, patProvider, organization, project)
 }
 
 // CreateCommand creates a cobra command instance of pipelines.
@@ -162,7 +162,7 @@ func createListPipelineBuildsCommand() *cobra.Command {
 				return err
 			}
 
-			builds, err := pipelineClient.ListPipelineBuilds(ctx)
+			builds, err := pipelineClient.ListPipelineBuilds(ctx, pipelineID)
 			if err != nil {
 				return err
 			}
@@ -224,7 +224,7 @@ func createTriggerPipelineRunCommand() *cobra.Command {
 				return err
 			}
 
-			run, err := pipelineClient.TriggerPipelineBuild(ctx, branch, extraVarPairs)
+			run, err := pipelineClient.TriggerPipelineBuild(ctx, pipelineID, branch, extraVarPairs)
 			if err != nil {
 				return err
 			}
