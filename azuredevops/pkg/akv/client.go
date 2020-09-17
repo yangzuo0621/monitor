@@ -1,23 +1,36 @@
 package akv
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"path"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.0/keyvault"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 )
 
-type AKVClient struct {
-	ClientID     string
-	TenantID     string
-	ClientSecret string
+type akvClient struct {
+	clientID     string
+	tenantID     string
+	clientSecret string
+}
+
+const vaultURL = "https://%s.vault.azure.net"
+
+// BuildAKVClient build a AKV client instance
+func BuildAKVClient(clientID string, tenantID string, clientSecret string) AKVClient {
+	return &akvClient{
+		clientID:     clientID,
+		tenantID:     tenantID,
+		clientSecret: clientSecret,
+	}
 }
 
 // GetAzureKeyVaultAuthorizer constructs authorizer for AKV
-func (c *AKVClient) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
+func (c *akvClient) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
 	cloudEnv, err := Environment()
 	if err != nil {
 		return nil, err
@@ -26,19 +39,38 @@ func (c *AKVClient) GetAzureKeyVaultAuthorizer() (autorest.Authorizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	alternateEndpoint.Path = path.Join(c.TenantID, "/oauth2/token")
+	alternateEndpoint.Path = path.Join(c.tenantID, "/oauth2/token")
 
-	oauthConfig, err := adal.NewOAuthConfig(cloudEnv.ActiveDirectoryEndpoint, c.TenantID)
+	oauthConfig, err := adal.NewOAuthConfig(cloudEnv.ActiveDirectoryEndpoint, c.tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("create OAuth config failed")
 	}
 	oauthConfig.AuthorizeEndpoint = *alternateEndpoint
 
 	vaultEndpoint := strings.TrimSuffix(cloudEnv.KeyVaultEndpoint, "/")
-	token, err := adal.NewServicePrincipalToken(*oauthConfig, c.ClientID, c.ClientSecret, vaultEndpoint)
+	token, err := adal.NewServicePrincipalToken(*oauthConfig, c.clientID, c.clientSecret, vaultEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("create service principal token failed: %w", err)
 	}
 
 	return autorest.NewBearerAuthorizer(token), nil
 }
+
+func (c *akvClient) GetSecretFromAzureKeyVault(ctx context.Context, vaultName string, secretName string) (*string, error) {
+	authorizer, err := c.GetAzureKeyVaultAuthorizer()
+	if err != nil {
+		return nil, err
+	}
+
+	kvClient := keyvault.New()
+	kvClient.Authorizer = authorizer
+
+	secret, err := kvClient.GetSecret(ctx, fmt.Sprintf(vaultURL, vaultName), secretName, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return secret.Value, nil
+}
+
+var _ AKVClient = (*akvClient)(nil)
