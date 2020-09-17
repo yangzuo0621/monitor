@@ -23,4 +23,7 @@ type PipelineClient interface {
 
 	// TriggerPipelineBuild creates a build intance of specified pipeline.
 	TriggerPipelineBuild(ctx context.Context, branch string, variables []string) (*vstspipelines.Run, error)
+
+	// QueueBuild creates a build instance of specified pipeline.
+	QueueBuild(ctx context.Context, branch string, commitID string, variables []string) (*vstsbuild.Build, error)
 }

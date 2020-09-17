@@ -2,6 +2,7 @@ package pipelines
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -228,6 +229,55 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, branch string
 	}
 
 	return resp, nil
+}
+
+func (c *pipelineClient) QueueBuild(ctx context.Context, branch string, commitID string, variables []string) (*vstsbuild.Build, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "QueueBuild",
+		"pipeline.id": c.pipelineID,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	if branch == "" {
+		branch = "refs/heads/master"
+	}
+
+	vars := map[string]vstspipelines.Variable{}
+	for _, v := range variables {
+		parts := strings.SplitN(v, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		vars[key] = vstspipelines.Variable{
+			Value: &value,
+		}
+	}
+
+	content, _ := json.Marshal(vars)
+	contentStr := string(content)
+
+	build, err := buildClient.QueueBuild(ctx, vstsbuild.QueueBuildArgs{
+		Build: &vstsbuild.Build{
+			Definition: &vstsbuild.DefinitionReference{
+				Id: &c.pipelineID,
+			},
+			SourceBranch:  &branch,
+			SourceVersion: &commitID,
+			Parameters:    &contentStr,
+		},
+		Project: &c.project,
+	})
+
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	return build, nil
 }
 
 func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string, pipelineID int) (PipelineClient, error) {
