@@ -6,6 +6,8 @@ type Data struct {
 	CommitID      string `json:"commit_id"`
 	BuildID       int    `json:"build_id"`
 	BuildStatus   string `json:"build_status"`
+	BuildResult   string `json:"build_result"`
 	ReleaseID     int    `json:"release_id"`
+	ReleaseDate   string `json:"release_date"`
 	ReleaseStatus string `json:"release_status"`
 }
