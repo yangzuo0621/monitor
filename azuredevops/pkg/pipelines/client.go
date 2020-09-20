@@ -268,6 +268,24 @@ func (c *pipelineClient) QueueBuild(ctx context.Context, pipelineID int, branch 
 	return build, nil
 }
 
+func (c *pipelineClient) GetArtifactsByBuildID(ctx context.Context, buildID int) (*[]vstsbuild.BuildArtifact, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":   "listPipelineBuilds",
+		"build.id": buildID,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	return buildClient.GetArtifacts(ctx, vstsbuild.GetArtifactsArgs{
+		Project: &c.project,
+		BuildId: &buildID,
+	})
+}
+
 func BuildPipelineClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string) (PipelineClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,

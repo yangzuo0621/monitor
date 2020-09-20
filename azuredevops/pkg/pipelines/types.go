@@ -26,4 +26,6 @@ type PipelineClient interface {
 
 	// QueueBuild creates a build instance of specified pipeline.
 	QueueBuild(ctx context.Context, pipelineID int, branch string, commitID string, variables map[string]string) (*vstsbuild.Build, error)
+
+	GetArtifactsByBuildID(ctx context.Context, buildID int) (*[]vstsbuild.BuildArtifact, error)
 }
