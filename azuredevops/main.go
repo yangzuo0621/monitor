@@ -19,15 +19,16 @@ import (
 const (
 	clientID           = ""
 	tenantID           = ""
-	vaultName          = "zuya20200815kv"
+	vaultName          = "zuya20200920akv"
 	clientSecret       = ""
-	accountName        = "zuya20200915account"
+	accountName        = "zuya20200920account"
 	containerName      = "test1"
 	accessKeyName      = "AccessKey"
 	organization       = "msazure"
 	project            = "CloudNativeCompute"
 	masterValidationID = 138746
 	devAKSDeployID     = 68881
+	aksBuildID         = 74751
 )
 
 const gitRepoFormat = "https://dev.azure.com/%s/%s/_git/%s"
@@ -56,21 +57,31 @@ func main() {
 	exist := blobClient.BlobExists(ctx, date)
 
 	if exist {
-		fmt.Println("exist")
-		blob, err := blobClient.GetBlob(ctx, date)
-		checkErr(err)
-		data := cicd.Data{}
-		json.Unmarshal(blob, &data)
-		fmt.Println(data)
+		for true {
+			fmt.Println("exist")
+			blob, err := blobClient.GetBlob(ctx, date)
+			checkErr(err)
+			data := cicd.Data{}
+			json.Unmarshal(blob, &data)
+			fmt.Println(data)
 
-		result, err := pipelineClient.GetPipelineBuildByID(ctx, data.BuildID)
-		checkErr(err)
+			result, err := pipelineClient.GetPipelineBuildByID(ctx, data.BuildID)
+			checkErr(err)
 
-		data.BuildStatus = string(*result.Status)
-		content, _ := json.Marshal(data)
-		r, err := blobClient.UploadBlob(ctx, date, content)
-		checkErr(err)
-		fmt.Println("status code=", r)
+			data.BuildStatus = string(*result.Status)
+			content, _ := json.Marshal(data)
+			r, err := blobClient.UploadBlob(ctx, date, content)
+			checkErr(err)
+			fmt.Println("status code=", r)
+
+			if strings.EqualFold(string(*result.Status), "Completed") {
+				fmt.Println("Completed")
+				break
+			} else {
+				fmt.Println("Sleep 5 mins")
+				time.Sleep(5 * time.Minute)
+			}
+		}
 	} else {
 		builds, err := pipelineClient.ListPipelineBuilds(ctx, masterValidationID)
 		checkErr(err)
@@ -84,8 +95,8 @@ func main() {
 			bs, _ := json.MarshalIndent(build, "", " ")
 			fmt.Println(string(bs))
 			variables := make(map[string]string)
-			variables["AKS_E2E_UNDERLAY_TYPE"] = "AKS_ENGINE_CLUSTER"
-			result, err := pipelineClient.QueueBuild(ctx, devAKSDeployID, *build.SourceBranch, *build.SourceVersion, variables)
+			// variables["AKS_E2E_UNDERLAY_TYPE"] = "AKS_ENGINE_CLUSTER"
+			result, err := pipelineClient.QueueBuild(ctx, aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
 			checkErr(err)
 
 			fmt.Println("================== Result ==================")
