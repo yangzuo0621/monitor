@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/akv"
-	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/cicd"
-	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/pipelines"
-	"github.com/yangzuo0621/azure-devops-cmd/azuredevops/pkg/storageaccountv2"
+	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/akv"
+	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/cicd"
+	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/pipelines"
+	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/storageaccountv2"
 )
 
 const (

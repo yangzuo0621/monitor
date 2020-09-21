@@ -10,5 +10,5 @@ require (
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b5
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
-	github.com/yangzuo0621/azure-devops-cmd/azuredevops v0.0.0-20200921093128-0590293ab610 // indirect
+	github.com/yangzuo0621/azure-devops-cmd/azuredevops v0.0.0-20200921093128-0590293ab610
 )
