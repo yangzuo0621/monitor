@@ -161,7 +161,8 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 	return nil
 }
 
-func (c *MonitorClient) Run(ctx context.Context, data *cicd.Data) {
+// MonitorAKSBuild monitors the running status of [EV2] AKS Build
+func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) error {
 	logger := c.logger.WithFields(logrus.Fields{
 		"action": "Run",
 	})
@@ -169,13 +170,13 @@ func (c *MonitorClient) Run(ctx context.Context, data *cicd.Data) {
 	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)
 	if err != nil {
 		logger.WithError(err).Error()
-		return
+		return err
 	}
 
 	build, err := pipelineClient.GetPipelineBuildByID(ctx, data.AKSBuild.ID)
 	if err != nil {
 		logger.WithError(err).Error()
-		return
+		return err
 	}
 
 	status := string(*build.Status)
@@ -186,11 +187,11 @@ func (c *MonitorClient) Run(ctx context.Context, data *cicd.Data) {
 		} else {
 			data.State = cicd.DataStateValues.BuildFailed
 		}
-
 		result := string(*build.Result)
 		data.AKSBuild.BuildResult = &result
 	} else {
 		data.State = cicd.DataStateValues.BuildInProgress
 	}
 	data.AKSBuild.BuildStatus = &status
+	return nil
 }
