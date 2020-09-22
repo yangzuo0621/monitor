@@ -58,19 +58,6 @@ func init() {
 	azureStorageContainer = os.Getenv(azureStorageContainerKey)
 	storageAccessKey = os.Getenv(storageAccessKeyKey)
 	personalAccessToken = os.Getenv(personalAccessTokenKey)
-
-	logger.Infof(
-		"organization=%s, project=%s, masterValidationE2EID=%d, aksBuildID=%d, releaseID=%d, azureStorageAccount=%s, azureStorageContainer=%s, storageAccessKey=%s, personalAccessToken=%s",
-		organization,
-		project,
-		masterValidationE2EID,
-		aksBuildID,
-		releaseID,
-		azureStorageAccount,
-		azureStorageContainer,
-		storageAccessKey,
-		personalAccessToken,
-	)
 }
 
 func main() {
@@ -109,13 +96,13 @@ func run() {
 
 	switch data.State {
 	case cicd.DataStateValues.None:
-		logger.Infoln(cicd.DataStateValues.None)
+		client.TriggerAKSBuild(ctx, data)
 	case cicd.DataStateValues.NotStart, cicd.DataStateValues.BuildInProgress:
-		logger.Infoln(cicd.DataStateValues)
+		client.MonitorAKSBuild(ctx, data)
 	case cicd.DataStateValues.BuildFailed:
-		logger.Infoln(cicd.DataStateValues.BuildFailed)
+		client.TriggerAKSBuild(ctx, data)
 	case cicd.DataStateValues.BuildSucceeded:
-		logger.Infoln(cicd.DataStateValues.BuildSucceeded)
+		logger.Infoln("Trigger release pipeline")
 	default:
 		logger.Infoln("default")
 	}

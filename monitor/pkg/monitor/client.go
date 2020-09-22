@@ -72,7 +72,7 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 	blobClient := storageaccountv2.BuildBlobClient(c.azureStorageAccount, c.azureStorageContainer, c.storageAccessKey)
 	exist := blobClient.BlobExists(ctx, blobName)
 
-	data := &cicd.Data{}
+	var data *cicd.Data
 	if exist {
 		blob, err := blobClient.GetBlob(ctx, blobName)
 		if err != nil {
@@ -85,7 +85,12 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 			return nil, err
 		}
 	} else {
-		data.State = cicd.DataStateValues.None
+		data = &cicd.Data{
+			MasterValidation: &cicd.MasterValidation{
+				ID: c.masterValidationE2EID,
+			},
+			State: cicd.DataStateValues.None,
+		}
 	}
 
 	return data, nil
@@ -124,10 +129,6 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		return err
 	}
 
-	data.MasterValidation = &cicd.MasterValidation{
-		ID: c.masterValidationE2EID,
-	}
-
 	builds, err := pipelineClient.ListPipelineBuilds(ctx, c.masterValidationE2EID)
 	if len(builds) > 0 {
 		build := builds[0]
@@ -135,6 +136,8 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		bs, _ := json.MarshalIndent(build, "", " ")
 		logger.Infoln(string(bs))
 		variables := make(map[string]string)
+		// result, err := pipelineClient.QueueBuild(ctx, c.aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
+		// 68881 just for testing
 		result, err := pipelineClient.QueueBuild(ctx, 68881, *build.SourceBranch, *build.SourceVersion, variables)
 		if err != nil {
 			logger.Errorln(err)
@@ -150,12 +153,19 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		id := ss[len(ss)-1]
 		i, _ := strconv.ParseInt(id, 10, 64)
 
-		data.MasterValidation.Branch = *build.SourceBranch
-		data.MasterValidation.CommitID = *build.SourceVersion
-		data.AKSBuild = &cicd.AKSBuild{
-			ID:    int(i),
-			Count: 0,
+		data.MasterValidation.Branch = build.SourceBranch
+		data.MasterValidation.CommitID = build.SourceVersion
+
+		if data.AKSBuild != nil {
+			data.AKSBuild.ID = int(i)
+			data.AKSBuild.Count = data.AKSBuild.Count + 1
+		} else {
+			data.AKSBuild = &cicd.AKSBuild{
+				ID:    int(i),
+				Count: 0,
+			}
 		}
+
 		data.State = cicd.DataStateValues.NotStart
 	}
 	return nil
@@ -164,7 +174,7 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 // MonitorAKSBuild monitors the running status of [EV2] AKS Build
 func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) error {
 	logger := c.logger.WithFields(logrus.Fields{
-		"action": "Run",
+		"action": "MonitorAKSBuild",
 	})
 
 	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)

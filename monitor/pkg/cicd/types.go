@@ -10,9 +10,9 @@ type Data struct {
 
 // MasterValidation encapsulates the information about `E2Ev2 AKS RP Master Validation`
 type MasterValidation struct {
-	ID       int    `json:"id"`
-	CommitID string `json:"commit_id"`
-	Branch   string `json:"branch"`
+	ID       int     `json:"id"`
+	CommitID *string `json:"commit_id,omitempty"`
+	Branch   *string `json:"branch,omitempty"`
 }
 
 // AKSBuild encapsulates the information about `[EV2] AKS Build` runs
