@@ -104,7 +104,7 @@ func (c *MonitorClient) UploadDataToBlob(ctx context.Context, blobName string, d
 	})
 
 	blobClient := storageaccountv2.BuildBlobClient(c.azureStorageAccount, c.azureStorageContainer, c.storageAccessKey)
-	content, err := json.Marshal(data)
+	content, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
 		logger.WithError(err).Error()
 		return err
