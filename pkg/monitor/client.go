@@ -8,10 +8,10 @@ import (
 
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/cicd"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/pipelines"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/storageaccountv2"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/vstspat"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/cicd"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/pipelines"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/storageaccountv2"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/vstspat"
 )
 
 const (

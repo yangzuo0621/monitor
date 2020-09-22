@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/git"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/pipelines"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/git"
+	"github.com/yangzuo0621/azure-devops-cmd/pkg/pipelines"
 )
 
 func main() {
