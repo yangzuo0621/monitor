@@ -21,7 +21,7 @@ const (
 	azureStorageContainerKey = "AZURE_STORAGE_CONTAINER"
 	storageAccessKeyKey      = "AZURE_STORAGE_ACCESS_KEY"
 	personalAccessTokenKey   = "PERSONAL_ACCESS_TOKEN"
-	monitorTimeInterval      = 1
+	monitorTimeInterval      = 5
 )
 
 var (
