@@ -2,18 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/cicd"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/pipelines"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/storageaccountv2"
-	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/vstspat"
+	"github.com/yangzuo0621/azure-devops-cmd/monitor/pkg/monitor"
 )
 
 const (
@@ -26,7 +21,7 @@ const (
 	azureStorageContainerKey = "AZURE_STORAGE_CONTAINER"
 	storageAccessKeyKey      = "AZURE_STORAGE_ACCESS_KEY"
 	personalAccessTokenKey   = "PERSONAL_ACCESS_TOKEN"
-	monitorTimeInterval      = 5
+	monitorTimeInterval      = 1
 )
 
 var (
@@ -88,95 +83,123 @@ func main() {
 }
 
 func run() {
+	client := monitor.BuildClient(
+		organization,
+		project,
+		masterValidationE2EID,
+		aksBuildID,
+		releaseID,
+		azureStorageAccount,
+		azureStorageContainer,
+		storageAccessKey,
+		personalAccessToken,
+		logger,
+	)
+
 	now := time.Now().UTC()
 	date := now.Format("2006-01-02")
 	logger.Infoln("date=", date)
 	ctx := context.Background()
-
-	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), organization, project)
+	data, err := client.GetDataFromBlob(ctx, date)
 	if err != nil {
 		logger.Errorln(err)
 		return
 	}
+	logger.Infof("%v", data)
 
-	blobClient := storageaccountv2.BuildBlobClient(azureStorageAccount, azureStorageContainer, storageAccessKey)
-	exist := blobClient.BlobExists(ctx, date)
-
-	if exist {
-		logger.Infoln("exist")
-		blob, err := blobClient.GetBlob(ctx, date)
-		if err != nil {
-			logger.Errorln(err)
-			return
-		}
-		data := cicd.Data{}
-		json.Unmarshal(blob, &data)
-		logger.Infoln(data)
-
-		result, err := pipelineClient.GetPipelineBuildByID(ctx, data.BuildID)
-		if err != nil {
-			logger.Errorln(err)
-			return
-		}
-
-		data.BuildStatus = string(*result.Status)
-		content, _ := json.Marshal(data)
-		r, err := blobClient.UploadBlob(ctx, date, content)
-		if err != nil {
-			logger.Errorln(err)
-			return
-		}
-		logger.Infoln("status code=", r)
-
-		if strings.EqualFold(string(*result.Status), "Completed") {
-			logger.Infoln("Completed")
-		}
-	} else {
-		builds, err := pipelineClient.ListPipelineBuilds(ctx, masterValidationE2EID)
-		if err != nil {
-			logger.Errorln(err)
-			return
-		}
-		for _, b := range builds {
-			logger.Infof("%-11s %d %s\n", *b.BuildNumber, *b.Id, *b.Result)
-		}
-
-		if len(builds) > 0 {
-			build := builds[0]
-			logger.Infoln("================== Build ==================")
-			bs, _ := json.MarshalIndent(build, "", " ")
-			logger.Infoln(string(bs))
-			variables := make(map[string]string)
-			// variables["AKS_E2E_UNDERLAY_TYPE"] = "AKS_ENGINE_CLUSTER"
-			// result, err := pipelineClient.QueueBuild(ctx, aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
-			result, err := pipelineClient.QueueBuild(ctx, 68881, *build.SourceBranch, *build.SourceVersion, variables)
-			if err != nil {
-				logger.Errorln(err)
-				return
-			}
-
-			fmt.Println("================== Result ==================")
-			bs, _ = json.MarshalIndent(result, "", " ")
-			fmt.Println(string(bs))
-
-			// "vstfs:///Build/Build/34898972"
-			ss := strings.Split(*result.Uri, "/")
-			id := ss[len(ss)-1]
-			i, _ := strconv.ParseInt(id, 10, 64)
-
-			data := cicd.Data{
-				BuildID:  int(i),
-				CommitID: *build.SourceVersion,
-			}
-
-			content, _ := json.Marshal(data)
-			r, err := blobClient.UploadBlob(ctx, date, content)
-			if err != nil {
-				logger.Errorln(err)
-				return
-			}
-			logger.Infoln("================== Status ==================")
-			logger.Infoln("status code=", r)
-		}
+	switch data.State {
+	case cicd.DataStateValues.None:
+		logger.Infoln(cicd.DataStateValues.None)
+	case cicd.DataStateValues.NotStart:
+		logger.Infoln(cicd.DataStateValues.NotStart)
+	default:
+		logger.Infoln("default")
 	}
+
+	// pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), organization, project)
+	// if err != nil {
+	// 	logger.Errorln(err)
+	// 	return
+	// }
+
+	// blobClient := storageaccountv2.BuildBlobClient(azureStorageAccount, azureStorageContainer, storageAccessKey)
+	// exist := blobClient.BlobExists(ctx, date)
+
+	// if exist {
+	// 	logger.Infoln("exist")
+	// 	blob, err := blobClient.GetBlob(ctx, date)
+	// 	if err != nil {
+	// 		logger.Errorln(err)
+	// 		return
+	// 	}
+	// 	data := cicd.Data{}
+	// 	json.Unmarshal(blob, &data)
+	// 	logger.Infoln(data)
+
+	// 	result, err := pipelineClient.GetPipelineBuildByID(ctx, data.BuildID)
+	// 	if err != nil {
+	// 		logger.Errorln(err)
+	// 		return
+	// 	}
+
+	// 	data.BuildStatus = string(*result.Status)
+	// 	content, _ := json.Marshal(data)
+	// 	r, err := blobClient.UploadBlob(ctx, date, content)
+	// 	if err != nil {
+	// 		logger.Errorln(err)
+	// 		return
+	// 	}
+	// 	logger.Infoln("status code=", r)
+
+	// 	if strings.EqualFold(string(*result.Status), "Completed") {
+	// 		logger.Infoln("Completed")
+	// 	}
+	// } else {
+	// 	builds, err := pipelineClient.ListPipelineBuilds(ctx, masterValidationE2EID)
+	// 	if err != nil {
+	// 		logger.Errorln(err)
+	// 		return
+	// 	}
+	// 	for _, b := range builds {
+	// 		logger.Infof("%-11s %d %s\n", *b.BuildNumber, *b.Id, *b.Result)
+	// 	}
+
+	// 	if len(builds) > 0 {
+	// 		build := builds[0]
+	// 		logger.Infoln("================== Build ==================")
+	// 		bs, _ := json.MarshalIndent(build, "", " ")
+	// 		logger.Infoln(string(bs))
+	// 		variables := make(map[string]string)
+	// 		// variables["AKS_E2E_UNDERLAY_TYPE"] = "AKS_ENGINE_CLUSTER"
+	// 		// result, err := pipelineClient.QueueBuild(ctx, aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
+	// 		result, err := pipelineClient.QueueBuild(ctx, 68881, *build.SourceBranch, *build.SourceVersion, variables)
+	// 		if err != nil {
+	// 			logger.Errorln(err)
+	// 			return
+	// 		}
+
+	// 		fmt.Println("================== Result ==================")
+	// 		bs, _ = json.MarshalIndent(result, "", " ")
+	// 		fmt.Println(string(bs))
+
+	// 		// "vstfs:///Build/Build/34898972"
+	// 		ss := strings.Split(*result.Uri, "/")
+	// 		id := ss[len(ss)-1]
+	// 		i, _ := strconv.ParseInt(id, 10, 64)
+
+	// 		data := cicd.Data{
+	// 			BuildID:  int(i),
+	// 			CommitID: *build.SourceVersion,
+	// 		}
+
+	// 		content, _ := json.Marshal(data)
+	// 		r, err := blobClient.UploadBlob(ctx, date, content)
+	// 		if err != nil {
+	// 			logger.Errorln(err)
+	// 			return
+	// 		}
+	// 		logger.Infoln("================== Status ==================")
+	// 		logger.Infoln("status code=", r)
+	// 	}
+	// }
 }

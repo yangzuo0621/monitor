@@ -31,6 +31,7 @@ type AKSRelease struct {
 type DataState string
 
 type dataStateValuesType struct {
+	None              DataState
 	NotStart          DataState
 	BuildInProgress   DataState
 	BuildFailed       DataState
@@ -41,6 +42,7 @@ type dataStateValuesType struct {
 }
 
 var DataStateValues = dataStateValuesType{
+	None:              "none",
 	NotStart:          "notStart",
 	BuildInProgress:   "buildInProgress",
 	BuildFailed:       "buildFailed",
