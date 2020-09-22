@@ -106,4 +106,10 @@ func run() {
 	default:
 		logger.Infoln("default")
 	}
+
+	err = client.UploadDataToBlob(ctx, date, data)
+	if err != nil {
+		logger.Errorln(err)
+		return
+	}
 }
