@@ -72,20 +72,20 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 	blobClient := storageaccountv2.BuildBlobClient(c.azureStorageAccount, c.azureStorageContainer, c.storageAccessKey)
 	exist := blobClient.BlobExists(ctx, blobName)
 
-	var data *cicd.Data
+	var data cicd.Data
 	if exist {
 		blob, err := blobClient.GetBlob(ctx, blobName)
 		if err != nil {
 			logger.WithError(err).Error()
 			return nil, err
 		}
-		err = json.Unmarshal(blob, data)
+		err = json.Unmarshal(blob, &data)
 		if err != nil {
 			logger.WithError(err).Error()
 			return nil, err
 		}
 	} else {
-		data = &cicd.Data{
+		data = cicd.Data{
 			MasterValidation: &cicd.MasterValidation{
 				ID: c.masterValidationE2EID,
 			},
@@ -93,7 +93,7 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 		}
 	}
 
-	return data, nil
+	return &data, nil
 }
 
 // UploadDataToBlob update data to azure storage account blob
@@ -162,7 +162,7 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		} else {
 			data.AKSBuild = &cicd.AKSBuild{
 				ID:    int(i),
-				Count: 0,
+				Count: 1,
 			}
 		}
 
@@ -192,7 +192,7 @@ func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) er
 	status := string(*build.Status)
 
 	if *build.Status == vstsbuild.BuildStatusValues.Completed {
-		if build.Result == &vstsbuild.BuildResultValues.Succeeded {
+		if *build.Result == vstsbuild.BuildResultValues.Succeeded {
 			data.State = cicd.DataStateValues.BuildSucceeded
 		} else {
 			data.State = cicd.DataStateValues.BuildFailed
