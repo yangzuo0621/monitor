@@ -110,8 +110,12 @@ func run() {
 	switch data.State {
 	case cicd.DataStateValues.None:
 		logger.Infoln(cicd.DataStateValues.None)
-	case cicd.DataStateValues.NotStart:
-		logger.Infoln(cicd.DataStateValues.NotStart)
+	case cicd.DataStateValues.NotStart, cicd.DataStateValues.BuildInProgress:
+		logger.Infoln(cicd.DataStateValues)
+	case cicd.DataStateValues.BuildFailed:
+		logger.Infoln(cicd.DataStateValues.BuildFailed)
+	case cicd.DataStateValues.BuildSucceeded:
+		logger.Infoln(cicd.DataStateValues.BuildSucceeded)
 	default:
 		logger.Infoln("default")
 	}
