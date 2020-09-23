@@ -65,38 +65,75 @@ func (c *releaseClient) GetReleaseByID(ctx context.Context, releaseID int) (*vst
 		logger.WithError(err).Error()
 		return nil, err
 	}
-
 	return release, nil
-
 }
 
-// func (c *releaseClient) ListReleases(ctx context.Context) ([]*vstsrelease.Release, error) {
-// 	logger := c.logger.WithFields(logrus.Fields{
-// 		"action": "ListReleases",
-// 	})
+func (c *releaseClient) CreateRelease(ctx context.Context, definitionID int, alias string, buildID string, buildNumber string, description string) (*vstsrelease.Release, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "CreateRelease",
+	})
 
-// 	client, err := c.buildClient(ctx)
-// 	if err != nil {
-// 		logger.WithError(err).Error()
-// 		return nil, err
-// 	}
+	client, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
 
-// 	resp, err := client.GetReleases(ctx, vstsrelease.GetReleasesArgs{})
-// 	if err != nil {
-// 		err = fmt.Errorf("get Releases failed: %w", err)
-// 		logger.WithError(err).Error()
-// 		return nil, err
-// 	}
+	release, err := client.CreateRelease(ctx, vstsrelease.CreateReleaseArgs{
+		Project: &c.project,
+		ReleaseStartMetadata: &vstsrelease.ReleaseStartMetadata{
+			DefinitionId: &definitionID,
+			Description:  &description,
+			Artifacts: &[]vstsrelease.ArtifactMetadata{
+				{
+					Alias: &alias,
+					InstanceReference: &vstsrelease.BuildVersion{
+						Id:   &buildID,
+						Name: &buildNumber,
+					},
+				},
+			},
+		},
+	})
 
-// 	var result []*vstsrelease.Release
-// 	for _, v := range resp.Value {
-// 		value := v
-// 		result = append(result, &value)
-// 	}
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+	return release, nil
+}
 
-// 	return result, nil
-// }
+func (c *releaseClient) ListReleases(ctx context.Context, releaseIDs []int) ([]*vstsrelease.Release, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "ListReleases",
+	})
 
+	client, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	resp, err := client.GetReleases(ctx, vstsrelease.GetReleasesArgs{
+		Project:         &c.project,
+		ReleaseIdFilter: &releaseIDs,
+	})
+	if err != nil {
+		err = fmt.Errorf("get Releases failed: %w", err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	var result []*vstsrelease.Release
+	for _, v := range resp.Value {
+		value := v
+		result = append(result, &value)
+	}
+
+	return result, nil
+}
+
+// BuildReleaseClient creates an instance of ReleaseClient
 func BuildReleaseClient(rootLogger logrus.FieldLogger, patProvider vstspat.PATProvider, org string, project string) (ReleaseClient, error) {
 	logger := rootLogger.WithFields(logrus.Fields{
 		"organization": org,
