@@ -1,13 +1,10 @@
 package main
 
 import (
-	"context"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/monitor/pkg/cicd"
 	"github.com/yangzuo0621/monitor/pkg/monitor"
 )
 
@@ -61,15 +58,6 @@ func init() {
 }
 
 func main() {
-	for true {
-		select {
-		case <-time.After(monitorTimeInterval * time.Minute):
-			run()
-		}
-	}
-}
-
-func run() {
 	client := monitor.BuildClient(
 		organization,
 		project,
@@ -83,33 +71,5 @@ func run() {
 		logger,
 	)
 
-	now := time.Now().UTC()
-	date := now.Format("2006-01-02")
-	logger.Infoln("date=", date)
-	ctx := context.Background()
-	data, err := client.GetDataFromBlob(ctx, date)
-	if err != nil {
-		logger.Errorln(err)
-		return
-	}
-	logger.Infof("%v", data)
-
-	switch data.State {
-	case cicd.DataStateValues.None:
-		client.TriggerAKSBuild(ctx, data)
-	case cicd.DataStateValues.NotStart, cicd.DataStateValues.BuildInProgress:
-		client.MonitorAKSBuild(ctx, data)
-	case cicd.DataStateValues.BuildFailed:
-		client.TriggerAKSBuild(ctx, data)
-	case cicd.DataStateValues.BuildSucceeded:
-		logger.Infoln("Trigger release pipeline")
-	default:
-		logger.Infoln("default")
-	}
-
-	err = client.UploadDataToBlob(ctx, date, data)
-	if err != nil {
-		logger.Errorln(err)
-		return
-	}
+	client.MonitorRoutine()
 }

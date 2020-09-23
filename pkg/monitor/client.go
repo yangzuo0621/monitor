@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/sirupsen/logrus"
@@ -16,8 +17,10 @@ import (
 
 const (
 	personalAccessTokenKey = "PERSONAL_ACCESS_TOKEN"
+	monitorTimeInterval    = 5
 )
 
+// MonitorClient encapsulates the data client needs
 type MonitorClient struct {
 	organization          string
 	project               string
@@ -32,6 +35,7 @@ type MonitorClient struct {
 	logger logrus.FieldLogger
 }
 
+// BuildClient creates an instance of MonitorClient
 func BuildClient(
 	organization string,
 	project string,
@@ -59,6 +63,47 @@ func BuildClient(
 		storageAccessKey:      storageAccessKey,
 		personalAccessToken:   personalAccessToken,
 		logger:                logger,
+	}
+}
+
+// MonitorRoutine monitors the status of CI/CD every 5 minutes
+func (c *MonitorClient) MonitorRoutine() {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "MonitorRoutine",
+	})
+
+	for true {
+		select {
+		case <-time.After(monitorTimeInterval * time.Minute):
+			now := time.Now().UTC()
+			date := now.Format("2006-01-02")
+			logger.Infoln("date=", date)
+			ctx := context.Background()
+			data, err := c.GetDataFromBlob(ctx, date)
+			if err != nil {
+				logger.Errorln(err)
+				return
+			}
+			logger.Infof("%v", data)
+
+			switch data.State {
+			case cicd.DataStateValues.None:
+				c.TriggerAKSBuild(ctx, data)
+			case cicd.DataStateValues.NotStart, cicd.DataStateValues.BuildInProgress:
+				c.MonitorAKSBuild(ctx, data)
+			case cicd.DataStateValues.BuildFailed:
+				c.TriggerAKSBuild(ctx, data)
+			case cicd.DataStateValues.BuildSucceeded:
+				logger.Infoln("Trigger release pipeline")
+			default:
+				logger.Infoln("default")
+			}
+
+			err = c.UploadDataToBlob(ctx, date, data)
+			if err != nil {
+				logger.Errorln(err)
+			}
+		}
 	}
 }
 
@@ -161,8 +206,10 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 			data.AKSBuild.Count = data.AKSBuild.Count + 1
 		} else {
 			data.AKSBuild = &cicd.AKSBuild{
-				ID:    int(i),
-				Count: 1,
+				ID:          int(i),
+				Count:       1,
+				BuildStatus: nil,
+				BuildResult: nil,
 			}
 		}
 
