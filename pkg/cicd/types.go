@@ -4,7 +4,7 @@ package cicd
 type Data struct {
 	MasterValidation *MasterValidation `json:"e2e_master_validation,omitempty"`
 	AKSBuild         *AKSBuild         `json:"ev2_aks_build,omitempty"`
-	AKSRelease       *AKSRelease       `json:"ev2_aks_release,omitempty"`
+	AKSRelease       []*AKSRelease     `json:"ev2_aks_release,omitempty"`
 	State            DataState         `json:"state"`
 }
 
@@ -26,7 +26,10 @@ type AKSBuild struct {
 
 // AKSRelease encapsulates the information about `AKS Release` runs
 type AKSRelease struct {
-	ID int `json:"id"`
+	DefinitionID int    `json:"definition_id"`
+	ReleaseID    int    `json:"release_id"`
+	Name         string `json:"name"`
+	Status       string `json:"status"`
 }
 
 type DataState string

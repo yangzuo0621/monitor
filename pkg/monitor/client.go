@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yangzuo0621/monitor/pkg/cicd"
 	"github.com/yangzuo0621/monitor/pkg/pipelines"
+	"github.com/yangzuo0621/monitor/pkg/releases"
 	"github.com/yangzuo0621/monitor/pkg/storageaccountv2"
 	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
@@ -26,7 +27,7 @@ type MonitorClient struct {
 	project               string
 	masterValidationE2EID int
 	aksBuildID            int
-	releaseID             int
+	releaseMetadata       []ReleaseMetadata
 	azureStorageAccount   string
 	azureStorageContainer string
 	storageAccessKey      string
@@ -35,13 +36,19 @@ type MonitorClient struct {
 	logger logrus.FieldLogger
 }
 
+type ReleaseMetadata struct {
+	ID       int
+	Alias    string
+	Stagings []string
+}
+
 // BuildClient creates an instance of MonitorClient
 func BuildClient(
 	organization string,
 	project string,
 	masterValidationE2EID int,
 	aksBuildID int,
-	releaseID int,
+	releaseMetadata []ReleaseMetadata,
 	azureStorageAccount string,
 	azureStorageContainer string,
 	storageAccessKey string,
@@ -57,7 +64,7 @@ func BuildClient(
 		project:               project,
 		masterValidationE2EID: masterValidationE2EID,
 		aksBuildID:            aksBuildID,
-		releaseID:             releaseID,
+		releaseMetadata:       releaseMetadata,
 		azureStorageAccount:   azureStorageAccount,
 		azureStorageContainer: azureStorageContainer,
 		storageAccessKey:      storageAccessKey,
@@ -94,7 +101,9 @@ func (c *MonitorClient) MonitorRoutine() {
 			case cicd.DataStateValues.BuildFailed:
 				c.TriggerAKSBuild(ctx, data)
 			case cicd.DataStateValues.BuildSucceeded:
-				logger.Infoln("Trigger release pipeline")
+				c.TriggerRelease(ctx, data)
+			case cicd.DataStateValues.ReleaseInProgress:
+				c.MonitorRelease(ctx, data)
 			default:
 				logger.Infoln("default")
 			}
@@ -251,4 +260,58 @@ func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) er
 	}
 	data.AKSBuild.BuildStatus = &status
 	return nil
+}
+
+// TriggerRelease triggers a release
+func (c *MonitorClient) TriggerRelease(ctx context.Context, data *cicd.Data) error {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "TriggerRelease",
+	})
+
+	releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)
+	if err != nil {
+		logger.WithError(err).Error()
+		return err
+	}
+
+	var resultErr error = nil
+	for _, v := range c.releaseMetadata {
+		release, err := releaseClient.CreateRelease(ctx, v.ID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, "Test")
+		if err != nil {
+			logger.WithError(err).Error()
+			resultErr = err
+		} else {
+			if data.AKSRelease == nil {
+				data.AKSRelease = []*cicd.AKSRelease{}
+			}
+			aksRelease, exist := findAKSReleaseByDefinitionID(data.AKSRelease, v.ID)
+			if exist {
+				aksRelease.Name = *release.Name
+				aksRelease.ReleaseID = *release.Id
+			} else {
+				data.AKSRelease = append(data.AKSRelease, &cicd.AKSRelease{
+					DefinitionID: v.ID,
+					Name:         *release.Name,
+					ReleaseID:    *release.Id,
+				})
+			}
+		}
+	}
+
+	data.State = cicd.DataStateValues.ReleaseInProgress
+	return resultErr
+}
+
+// MonitorRelease monitors the status of release
+func (c *MonitorClient) MonitorRelease(ctx context.Context, data *cicd.Data) {
+
+}
+
+func findAKSReleaseByDefinitionID(aksReleases []*cicd.AKSRelease, definitionID int) (*cicd.AKSRelease, bool) {
+	for _, v := range aksReleases {
+		if v.DefinitionID == definitionID {
+			return v, true
+		}
+	}
+	return nil, false
 }
