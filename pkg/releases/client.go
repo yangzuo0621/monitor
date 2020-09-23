@@ -7,7 +7,7 @@ import (
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsrelease "github.com/microsoft/azure-devops-go-api/azuredevops/release"
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/vstspat"
+	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
 
 const vstsResourceURL = "https://dev.azure.com/%s"

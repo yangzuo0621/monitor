@@ -11,7 +11,7 @@ import (
 	vstsbuild "github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	vstspipelines "github.com/microsoft/azure-devops-go-api/azuredevops/pipelines"
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/vstspat"
+	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
 
 const vstsResourceURL = "https://dev.azure.com/%s"

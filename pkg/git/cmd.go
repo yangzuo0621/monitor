@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/vstspat"
+	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
 
 const (

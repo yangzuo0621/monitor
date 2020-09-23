@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/cicd"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/monitor"
+	"github.com/yangzuo0621/monitor/pkg/cicd"
+	"github.com/yangzuo0621/monitor/pkg/monitor"
 )
 
 const (

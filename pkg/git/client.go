@@ -10,7 +10,7 @@ import (
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsgit "github.com/microsoft/azure-devops-go-api/azuredevops/git"
 	"github.com/sirupsen/logrus"
-	"github.com/yangzuo0621/azure-devops-cmd/pkg/vstspat"
+	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
 
 const (
