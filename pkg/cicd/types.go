@@ -20,6 +20,7 @@ type AKSBuild struct {
 	ID          int     `json:"id"`
 	BuildStatus *string `json:"status,omitempty"`
 	BuildResult *string `json:"result,omitempty"`
+	BuildNumber *string `json:"build_number,omitempty"`
 	Count       int     `json:"count"`
 }
 

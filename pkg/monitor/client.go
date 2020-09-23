@@ -181,9 +181,7 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		bs, _ := json.MarshalIndent(build, "", " ")
 		logger.Infoln(string(bs))
 		variables := make(map[string]string)
-		// result, err := pipelineClient.QueueBuild(ctx, c.aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
-		// 68881 just for testing
-		result, err := pipelineClient.QueueBuild(ctx, 68881, *build.SourceBranch, *build.SourceVersion, variables)
+		result, err := pipelineClient.QueueBuild(ctx, c.aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
 		if err != nil {
 			logger.Errorln(err)
 			return err
@@ -204,12 +202,14 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		if data.AKSBuild != nil {
 			data.AKSBuild.ID = int(i)
 			data.AKSBuild.Count = data.AKSBuild.Count + 1
+			data.AKSBuild.BuildNumber = build.BuildNumber
 			data.AKSBuild.BuildResult = nil
 			data.AKSBuild.BuildStatus = nil
 		} else {
 			data.AKSBuild = &cicd.AKSBuild{
-				ID:    int(i),
-				Count: 1,
+				ID:          int(i),
+				BuildNumber: build.BuildNumber,
+				Count:       1,
 			}
 		}
 
