@@ -5,9 +5,12 @@
 replicaCount: 1
 
 image:
-  repository: nginx
-  tag: stable
-  pullPolicy: IfNotPresent
+  repository: zuya20200924acr.azurecr.io/monitor
+  tag: v1
+  pullPolicy: Always
+
+personalAccessToken: ""
+storageAccountAccessKey: ""
 
 nameOverride: ""
 fullnameOverride: ""
