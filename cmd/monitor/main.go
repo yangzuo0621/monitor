@@ -29,7 +29,15 @@ func init() {
 	})
 
 	storageAccessKey = os.Getenv(storageAccessKeyKey)
+	if storageAccessKey == "" {
+		logger.Fatalln("env storageAccessKey not set")
+		os.Exit(-1)
+	}
 	personalAccessToken = os.Getenv(personalAccessTokenKey)
+	if personalAccessToken == "" {
+		logger.Fatalln("env personalAccessToken not set")
+		os.Exit(-1)
+	}
 }
 
 func main() {
