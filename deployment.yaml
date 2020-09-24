@@ -14,42 +14,12 @@ spec:
       containers:
       - name: monitor
         image: zuya20200921acr.azurecr.io/monitor:v1
+        args: [ "--config", "/config/config.json" ]
+        volumeMounts:
+          - mountPath: /config
+            name: config-map
+            readOnly: true
         env:
-          - name: ORGANIZATION
-            valueFrom:
-              configMapKeyRef:
-                key: organization
-                name: monitor-config
-          - name: PROJECT
-            valueFrom:
-              configMapKeyRef:
-                key: project
-                name: monitor-config
-          - name: MASTER_VALIDATION_E2E_ID
-            valueFrom:
-              configMapKeyRef:
-                key: masterValidationE2EID
-                name: monitor-config
-          - name: AKS_BUILD_ID
-            valueFrom:
-              configMapKeyRef:
-                key: aksBuildID
-                name: monitor-config
-          - name: RELEASE_ID
-            valueFrom:
-              configMapKeyRef:
-                key: releaseID
-                name: monitor-config
-          - name: AZURE_STORAGE_ACCOUNT
-            valueFrom:
-              configMapKeyRef:
-                key: azureStorageAccount
-                name: monitor-config
-          - name: AZURE_STORAGE_CONTAINER
-            valueFrom:
-              configMapKeyRef:
-                key: azureStorageContainer
-                name: monitor-config
           - name: AZURE_STORAGE_ACCESS_KEY
             valueFrom:
               secretKeyRef:
@@ -67,3 +37,8 @@ spec:
         ports:
         - containerPort: 8080
         imagePullPolicy: Always
+      volumes:
+        - name: config-map
+          configMap:
+            name: monitor-config
+

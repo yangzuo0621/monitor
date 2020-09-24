@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yangzuo0621/monitor/pkg/cicd"
 	"github.com/yangzuo0621/monitor/pkg/pipelines"
-	"github.com/yangzuo0621/monitor/pkg/releases"
 	"github.com/yangzuo0621/monitor/pkg/storageaccountv2"
 	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
@@ -23,15 +22,9 @@ const (
 
 // MonitorClient encapsulates the data client needs
 type MonitorClient struct {
-	organization          string
-	project               string
-	masterValidationE2EID int
-	aksBuildID            int
-	releaseMetadata       []ReleaseMetadata
-	azureStorageAccount   string
-	azureStorageContainer string
-	storageAccessKey      string
-	personalAccessToken   string
+	storageAccessKey    string
+	personalAccessToken string
+	config              *Config
 
 	logger logrus.FieldLogger
 }
@@ -42,34 +35,38 @@ type ReleaseMetadata struct {
 	Stagings []string
 }
 
+type Config struct {
+	Organization          string     `json:"organization"`
+	Project               string     `json:"project"`
+	MasterValidationE2EID int        `json:"master_validation_e2e_id"`
+	AksBuildID            int        `json:"aks_build_id"`
+	AksRelease            []*Release `json:"aks_release"`
+	AzureStorageAccount   string     `json:"azure_storage_account"`
+	AzureStorageContainer string     `json:"azure_storage_container"`
+}
+
+type Release struct {
+	DefinitionID int      `json:"definition_id"`
+	Alias        string   `json:"source_alias"`
+	Stagings     []string `json:"staging"`
+}
+
 // BuildClient creates an instance of MonitorClient
 func BuildClient(
-	organization string,
-	project string,
-	masterValidationE2EID int,
-	aksBuildID int,
-	releaseMetadata []ReleaseMetadata,
-	azureStorageAccount string,
-	azureStorageContainer string,
 	storageAccessKey string,
 	personalAccessToken string,
+	config *Config,
 	rootLogger logrus.FieldLogger,
 ) *MonitorClient {
 	logger := rootLogger.WithFields(logrus.Fields{
-		"organization": organization,
-		"project":      project,
+		"organization": config.Organization,
+		"project":      config.Project,
 	})
 	return &MonitorClient{
-		organization:          organization,
-		project:               project,
-		masterValidationE2EID: masterValidationE2EID,
-		aksBuildID:            aksBuildID,
-		releaseMetadata:       releaseMetadata,
-		azureStorageAccount:   azureStorageAccount,
-		azureStorageContainer: azureStorageContainer,
-		storageAccessKey:      storageAccessKey,
-		personalAccessToken:   personalAccessToken,
-		logger:                logger,
+		storageAccessKey:    storageAccessKey,
+		personalAccessToken: personalAccessToken,
+		config:              config,
+		logger:              logger,
 	}
 }
 
@@ -101,9 +98,9 @@ func (c *MonitorClient) MonitorRoutine() {
 			case cicd.DataStateValues.BuildFailed:
 				c.TriggerAKSBuild(ctx, data)
 			case cicd.DataStateValues.BuildSucceeded:
-				c.TriggerRelease(ctx, data)
+				// c.TriggerRelease(ctx, data)
 			case cicd.DataStateValues.ReleaseInProgress:
-				c.MonitorRelease(ctx, data)
+				// c.MonitorRelease(ctx, data)
 			default:
 				logger.Infoln("default")
 			}
@@ -123,7 +120,7 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 		"blob":   blobName,
 	})
 
-	blobClient := storageaccountv2.BuildBlobClient(c.azureStorageAccount, c.azureStorageContainer, c.storageAccessKey)
+	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey)
 	exist := blobClient.BlobExists(ctx, blobName)
 
 	var data cicd.Data
@@ -141,7 +138,7 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 	} else {
 		data = cicd.Data{
 			MasterValidation: &cicd.MasterValidation{
-				ID: c.masterValidationE2EID,
+				ID: c.config.MasterValidationE2EID,
 			},
 			State: cicd.DataStateValues.None,
 		}
@@ -157,7 +154,7 @@ func (c *MonitorClient) UploadDataToBlob(ctx context.Context, blobName string, d
 		"blob":   blobName,
 	})
 
-	blobClient := storageaccountv2.BuildBlobClient(c.azureStorageAccount, c.azureStorageContainer, c.storageAccessKey)
+	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey)
 	content, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
 		logger.WithError(err).Error()
@@ -177,20 +174,20 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		"action": "TriggerAKSBuild",
 	})
 
-	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)
+	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
 	if err != nil {
 		logger.WithError(err).Error()
 		return err
 	}
 
-	builds, err := pipelineClient.ListPipelineBuilds(ctx, c.masterValidationE2EID)
+	builds, err := pipelineClient.ListPipelineBuilds(ctx, c.config.MasterValidationE2EID)
 	if len(builds) > 0 {
 		build := builds[0]
 		logger.Infoln("================== Build ==================")
 		bs, _ := json.MarshalIndent(build, "", " ")
 		logger.Infoln(string(bs))
 		variables := make(map[string]string)
-		result, err := pipelineClient.QueueBuild(ctx, c.aksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
+		result, err := pipelineClient.QueueBuild(ctx, c.config.AksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
 		if err != nil {
 			logger.Errorln(err)
 			return err
@@ -233,7 +230,7 @@ func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) er
 		"action": "MonitorAKSBuild",
 	})
 
-	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)
+	pipelineClient, err := pipelines.BuildPipelineClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
 	if err != nil {
 		logger.WithError(err).Error()
 		return err
@@ -264,42 +261,42 @@ func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) er
 
 // TriggerRelease triggers a release
 func (c *MonitorClient) TriggerRelease(ctx context.Context, data *cicd.Data) error {
-	logger := c.logger.WithFields(logrus.Fields{
-		"action": "TriggerRelease",
-	})
+	// logger := c.logger.WithFields(logrus.Fields{
+	// 	"action": "TriggerRelease",
+	// })
 
-	releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.organization, c.project)
-	if err != nil {
-		logger.WithError(err).Error()
-		return err
-	}
+	// releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
+	// if err != nil {
+	// 	logger.WithError(err).Error()
+	// 	return err
+	// }
 
-	var resultErr error = nil
-	for _, v := range c.releaseMetadata {
-		release, err := releaseClient.CreateRelease(ctx, v.ID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, "Test")
-		if err != nil {
-			logger.WithError(err).Error()
-			resultErr = err
-		} else {
-			if data.AKSRelease == nil {
-				data.AKSRelease = []*cicd.AKSRelease{}
-			}
-			aksRelease, exist := findAKSReleaseByDefinitionID(data.AKSRelease, v.ID)
-			if exist {
-				aksRelease.Name = *release.Name
-				aksRelease.ReleaseID = *release.Id
-			} else {
-				data.AKSRelease = append(data.AKSRelease, &cicd.AKSRelease{
-					DefinitionID: v.ID,
-					Name:         *release.Name,
-					ReleaseID:    *release.Id,
-				})
-			}
-		}
-	}
+	// var resultErr error = nil
+	// for _, v := range c.config.AksRelease {
+	// 	release, err := releaseClient.CreateRelease(ctx, v.ID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, "Test")
+	// 	if err != nil {
+	// 		logger.WithError(err).Error()
+	// 		resultErr = err
+	// 	} else {
+	// 		if data.AKSRelease == nil {
+	// 			data.AKSRelease = []*cicd.AKSRelease{}
+	// 		}
+	// 		aksRelease, exist := findAKSReleaseByDefinitionID(data.AKSRelease, v.ID)
+	// 		if exist {
+	// 			aksRelease.Name = *release.Name
+	// 			aksRelease.ReleaseID = *release.Id
+	// 		} else {
+	// 			data.AKSRelease = append(data.AKSRelease, &cicd.AKSRelease{
+	// 				DefinitionID: v.ID,
+	// 				Name:         *release.Name,
+	// 				ReleaseID:    *release.Id,
+	// 			})
+	// 		}
+	// 	}
+	// }
 
-	data.State = cicd.DataStateValues.ReleaseInProgress
-	return resultErr
+	// data.State = cicd.DataStateValues.ReleaseInProgress
+	return nil
 }
 
 // MonitorRelease monitors the status of release

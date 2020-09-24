@@ -1,0 +1,17 @@
+{
+  "organization": "msazure",
+  "project": "CloudNativeCompute",
+  "master_validation_e2e_id": 138746,
+  "aks_build_id": 74751,
+  "aks_release": [
+   {
+    "definition_id": 452,
+    "source_alias": "ev2_artifacts",
+    "staging": [
+     "Prod: staging westus2"
+    ]
+   }
+  ],
+  "azure_storage_account": "zuya20200921account",
+  "azure_storage_container": "test"
+ }

@@ -1,36 +1,24 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"os"
-	"strconv"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/yangzuo0621/monitor/pkg/monitor"
 )
 
 const (
-	organizationKey          = "ORGANIZATION"
-	projectKey               = "PROJECT"
-	masterValidationE2EIDKey = "MASTER_VALIDATION_E2E_ID"
-	aksBuildIDKey            = "AKS_BUILD_ID"
-	releaseIDKey             = "RELEASE_ID"
-	azureStorageAccountKey   = "AZURE_STORAGE_ACCOUNT"
-	azureStorageContainerKey = "AZURE_STORAGE_CONTAINER"
-	storageAccessKeyKey      = "AZURE_STORAGE_ACCESS_KEY"
-	personalAccessTokenKey   = "PERSONAL_ACCESS_TOKEN"
-	monitorTimeInterval      = 5
+	storageAccessKeyKey    = "AZURE_STORAGE_ACCESS_KEY"
+	personalAccessTokenKey = "PERSONAL_ACCESS_TOKEN"
 )
 
 var (
-	organization          string
-	project               string
-	masterValidationE2EID int
-	aksBuildID            int
-	releaseID             int
-	azureStorageAccount   string
-	azureStorageContainer string
-	storageAccessKey      string
-	personalAccessToken   string
+	storageAccessKey    string
+	personalAccessToken string
+	configPath          string
 
 	logger *logrus.Entry
 )
@@ -40,36 +28,43 @@ func init() {
 		"source": "monitor",
 	})
 
-	organization = os.Getenv(organizationKey)
-	project = os.Getenv(projectKey)
-	i, _ := strconv.ParseInt(os.Getenv(masterValidationE2EIDKey), 10, 64)
-	masterValidationE2EID = int(i)
-
-	i, _ = strconv.ParseInt(os.Getenv(aksBuildIDKey), 0, 64)
-	aksBuildID = int(i)
-
-	i, _ = strconv.ParseInt(os.Getenv(releaseIDKey), 0, 64)
-	releaseID = int(i)
-
-	azureStorageAccount = os.Getenv(azureStorageAccountKey)
-	azureStorageContainer = os.Getenv(azureStorageContainerKey)
 	storageAccessKey = os.Getenv(storageAccessKeyKey)
 	personalAccessToken = os.Getenv(personalAccessTokenKey)
 }
 
 func main() {
-	client := monitor.BuildClient(
-		organization,
-		project,
-		masterValidationE2EID,
-		aksBuildID,
-		releaseID,
-		azureStorageAccount,
-		azureStorageContainer,
-		storageAccessKey,
-		personalAccessToken,
-		logger,
-	)
+	rootCmd := &cobra.Command{
+		Use:          "monitor",
+		Short:        "monitor CI/CD process",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configContent, err := ioutil.ReadFile(configPath)
+			if err != nil {
+				return err
+			}
+			var c monitor.Config
+			err = json.Unmarshal(configContent, &c)
+			if err != nil {
+				return err
+			}
 
-	client.MonitorRoutine()
+			client := monitor.BuildClient(
+				storageAccessKey,
+				personalAccessToken,
+				&c,
+				logger,
+			)
+
+			client.MonitorRoutine()
+			return nil
+		},
+	}
+
+	rootCmd.Flags().StringVar(&configPath, "config", "", "config file path")
+	rootCmd.MarkFlagRequired("config")
+
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(-1)
+	}
+
 }
