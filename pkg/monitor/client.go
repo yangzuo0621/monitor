@@ -295,7 +295,7 @@ func (c *MonitorClient) TriggerRelease(ctx context.Context, data *cicd.Data) err
 
 	var resultErr error = nil
 	for _, v := range data.AKSRelease {
-		release, err := releaseClient.CreateRelease(ctx, v.DefinitionID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, fmt.Sprintf("Daily release: %s", data.Date))
+		release, err := releaseClient.CreateRelease(ctx, v.DefinitionID, v.Alias, strconv.Itoa(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, fmt.Sprintf("Daily release: %s", data.Date))
 		if err != nil {
 			logger.WithError(err).Error()
 			resultErr = err
