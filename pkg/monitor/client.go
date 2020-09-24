@@ -230,13 +230,13 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		if data.AKSBuild != nil {
 			data.AKSBuild.ID = int(i)
 			data.AKSBuild.Count = data.AKSBuild.Count + 1
-			data.AKSBuild.BuildNumber = build.BuildNumber
+			data.AKSBuild.BuildNumber = result.BuildNumber
 			data.AKSBuild.BuildResult = nil
 			data.AKSBuild.BuildStatus = nil
 		} else {
 			data.AKSBuild = &cicd.AKSBuild{
 				ID:          int(i),
-				BuildNumber: build.BuildNumber,
+				BuildNumber: result.BuildNumber,
 				Count:       1,
 			}
 		}
