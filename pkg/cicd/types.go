@@ -6,6 +6,7 @@ type Data struct {
 	AKSBuild         *AKSBuild         `json:"ev2_aks_build,omitempty"`
 	AKSRelease       []*AKSRelease     `json:"ev2_aks_release,omitempty"`
 	State            DataState         `json:"state"`
+	Date             string            `json:"date"`
 }
 
 // MasterValidation encapsulates the information about `E2Ev2 AKS RP Master Validation`
@@ -26,10 +27,16 @@ type AKSBuild struct {
 
 // AKSRelease encapsulates the information about `AKS Release` runs
 type AKSRelease struct {
-	DefinitionID int    `json:"definition_id"`
-	ReleaseID    int    `json:"release_id"`
-	Name         string `json:"name"`
-	Status       string `json:"status"`
+	DefinitionID int        `json:"definition_id"`
+	Alias        string     `json:"source_alias"`
+	ReleaseID    *int       `json:"release_id,omitempty"`
+	ReleaseName  *string    `json:"release_name,omitempty"`
+	Staging      []*Staging `json:"staging,omitempty"`
+}
+
+type Staging struct {
+	Name   string  `json:"staging_name"`
+	Status *string `json:"staging_status,omitempty"`
 }
 
 type DataState string

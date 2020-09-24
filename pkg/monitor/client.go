@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yangzuo0621/monitor/pkg/cicd"
 	"github.com/yangzuo0621/monitor/pkg/pipelines"
+	"github.com/yangzuo0621/monitor/pkg/releases"
 	"github.com/yangzuo0621/monitor/pkg/storageaccountv2"
 	"github.com/yangzuo0621/monitor/pkg/vstspat"
 )
@@ -98,9 +100,9 @@ func (c *MonitorClient) MonitorRoutine() {
 			case cicd.DataStateValues.BuildFailed:
 				c.TriggerAKSBuild(ctx, data)
 			case cicd.DataStateValues.BuildSucceeded:
-				// c.TriggerRelease(ctx, data)
+				c.TriggerRelease(ctx, data)
 			case cicd.DataStateValues.ReleaseInProgress:
-				// c.MonitorRelease(ctx, data)
+				c.MonitorRelease(ctx, data)
 			default:
 				logger.Infoln("default")
 			}
@@ -136,11 +138,31 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 			return nil, err
 		}
 	} else {
+		length := len(c.config.AksRelease)
+		aksReleases := make([]*cicd.AKSRelease, length)
+
+		for i := 0; i < length; i++ {
+			ss := c.config.AksRelease[i].Stagings
+			stagings := make([]*cicd.Staging, len(ss))
+			for j := 0; j < len(ss); j++ {
+				stagings[j] = &cicd.Staging{
+					Name: ss[j],
+				}
+			}
+			aksReleases[i] = &cicd.AKSRelease{
+				DefinitionID: c.config.AksRelease[i].DefinitionID,
+				Alias:        c.config.AksRelease[i].Alias,
+				Staging:      stagings,
+			}
+		}
+
 		data = cicd.Data{
 			MasterValidation: &cicd.MasterValidation{
 				ID: c.config.MasterValidationE2EID,
 			},
-			State: cicd.DataStateValues.None,
+			State:      cicd.DataStateValues.None,
+			AKSRelease: aksReleases,
+			Date:       blobName,
 		}
 	}
 
@@ -261,54 +283,62 @@ func (c *MonitorClient) MonitorAKSBuild(ctx context.Context, data *cicd.Data) er
 
 // TriggerRelease triggers a release
 func (c *MonitorClient) TriggerRelease(ctx context.Context, data *cicd.Data) error {
-	// logger := c.logger.WithFields(logrus.Fields{
-	// 	"action": "TriggerRelease",
-	// })
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "TriggerRelease",
+	})
 
-	// releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
-	// if err != nil {
-	// 	logger.WithError(err).Error()
-	// 	return err
-	// }
+	releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
+	if err != nil {
+		logger.WithError(err).Error()
+		return err
+	}
 
-	// var resultErr error = nil
-	// for _, v := range c.config.AksRelease {
-	// 	release, err := releaseClient.CreateRelease(ctx, v.ID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, "Test")
-	// 	if err != nil {
-	// 		logger.WithError(err).Error()
-	// 		resultErr = err
-	// 	} else {
-	// 		if data.AKSRelease == nil {
-	// 			data.AKSRelease = []*cicd.AKSRelease{}
-	// 		}
-	// 		aksRelease, exist := findAKSReleaseByDefinitionID(data.AKSRelease, v.ID)
-	// 		if exist {
-	// 			aksRelease.Name = *release.Name
-	// 			aksRelease.ReleaseID = *release.Id
-	// 		} else {
-	// 			data.AKSRelease = append(data.AKSRelease, &cicd.AKSRelease{
-	// 				DefinitionID: v.ID,
-	// 				Name:         *release.Name,
-	// 				ReleaseID:    *release.Id,
-	// 			})
-	// 		}
-	// 	}
-	// }
+	var resultErr error = nil
+	for _, v := range data.AKSRelease {
+		release, err := releaseClient.CreateRelease(ctx, v.DefinitionID, v.Alias, string(data.AKSBuild.ID), *data.AKSBuild.BuildNumber, fmt.Sprintf("Daily release: %s", data.Date))
+		if err != nil {
+			logger.WithError(err).Error()
+			resultErr = err
+		} else {
+			v.ReleaseID = release.Id
+			v.ReleaseName = release.Name
+		}
+	}
 
-	// data.State = cicd.DataStateValues.ReleaseInProgress
-	return nil
+	data.State = cicd.DataStateValues.ReleaseInProgress
+	return resultErr
 }
 
 // MonitorRelease monitors the status of release
-func (c *MonitorClient) MonitorRelease(ctx context.Context, data *cicd.Data) {
+func (c *MonitorClient) MonitorRelease(ctx context.Context, data *cicd.Data) error {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action": "MonitorRelease",
+	})
 
-}
+	releaseClient, err := releases.BuildReleaseClient(logger, vstspat.NewPATEnvBackend(personalAccessTokenKey), c.config.Organization, c.config.Project)
+	if err != nil {
+		logger.WithError(err).Error()
+		return err
+	}
 
-func findAKSReleaseByDefinitionID(aksReleases []*cicd.AKSRelease, definitionID int) (*cicd.AKSRelease, bool) {
-	for _, v := range aksReleases {
-		if v.DefinitionID == definitionID {
-			return v, true
+	var resultErr error = nil
+	for _, v := range data.AKSRelease {
+		release, err := releaseClient.GetReleaseByID(ctx, *v.ReleaseID)
+		if err != nil {
+			logger.WithError(err).Error()
+			resultErr = err
+		} else {
+			for _, s := range v.Staging {
+				for _, e := range *release.Environments {
+					if strings.EqualFold(s.Name, *e.Name) {
+						status := string(*e.Status)
+						s.Status = &status
+						break
+					}
+				}
+			}
 		}
 	}
-	return nil, false
+
+	return resultErr
 }
