@@ -122,7 +122,7 @@ func (c *MonitorClient) GetDataFromBlob(ctx context.Context, blobName string) (*
 		"blob":   blobName,
 	})
 
-	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey)
+	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey, logger)
 	exist := blobClient.BlobExists(ctx, blobName)
 
 	var data cicd.Data
@@ -176,7 +176,7 @@ func (c *MonitorClient) UploadDataToBlob(ctx context.Context, blobName string, d
 		"blob":   blobName,
 	})
 
-	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey)
+	blobClient := storageaccountv2.BuildBlobClient(c.config.AzureStorageAccount, c.config.AzureStorageContainer, c.storageAccessKey, logger)
 	content, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
 		logger.WithError(err).Error()

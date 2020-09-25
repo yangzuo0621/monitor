@@ -9,22 +9,29 @@ import (
 	"net/url"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/sirupsen/logrus"
 )
 
 type blobClient struct {
 	accountName   string
 	containerName string
 	accessKey     string
+
+	logger logrus.FieldLogger
 }
 
 const blobURL = `https://%s.blob.core.windows.net`
 
 // BuildBlobClient build a blob client instance
-func BuildBlobClient(accountName string, containerName string, accessKey string) BlobClient {
+func BuildBlobClient(accountName string, containerName string, accessKey string, rootLogger logrus.FieldLogger) BlobClient {
+	logger := rootLogger.WithFields(logrus.Fields{
+		"source": "blob client",
+	})
 	return &blobClient{
 		accountName:   accountName,
 		containerName: containerName,
 		accessKey:     accessKey,
+		logger:        logger,
 	}
 }
 
