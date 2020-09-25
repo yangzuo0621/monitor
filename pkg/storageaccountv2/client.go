@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -78,7 +79,7 @@ func (c *blobClient) GetBlob(ctx context.Context, blobName string) ([]byte, erro
 func (c *blobClient) UploadBlob(ctx context.Context, blobName string, content []byte) (int, error) {
 	container, err := c.GetContainerURL()
 	if err != nil {
-		return 400, err
+		return http.StatusBadRequest, err
 	}
 	blob := container.NewBlobURL(blobName)
 
@@ -90,7 +91,7 @@ func (c *blobClient) UploadBlob(ctx context.Context, blobName string, content []
 		azblob.BlobAccessConditions{})
 
 	if err != nil {
-		return 400, err
+		return http.StatusBadRequest, err
 	}
 	return resp.StatusCode(), nil
 }
