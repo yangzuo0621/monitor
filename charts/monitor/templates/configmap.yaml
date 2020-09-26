@@ -18,6 +18,6 @@ data:
           ]
         }
       ],
-      "azure_storage_account": "zuya20200924account",
-      "azure_storage_container": "test"
+      "azure_storage_account": "{{ .Values.azureStorageAccount }}",
+      "azure_storage_container": "{{ .Values.azureCICDContainer }}"
     }

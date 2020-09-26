@@ -11,6 +11,8 @@ image:
 
 personalAccessToken: ""
 storageAccountAccessKey: ""
+azureStorageAccount: "zuya20200924account"
+azureCICDContainer: "test"
 
 nameOverride: ""
 fullnameOverride: ""
