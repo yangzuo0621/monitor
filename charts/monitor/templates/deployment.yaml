@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "monitor.fullname" . }}
+  name: {{ .Chart.Name }}
   labels:
     app: {{ .Chart.Name }}
 spec:
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.image.registry }}/monitor:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args:
         - --config=/config/config.json
@@ -29,18 +29,16 @@ spec:
             valueFrom:
               secretKeyRef:
                 key: accesskey
-                name: monitor-secret
+                name: {{ .Values.secrets }}
           - name: PERSONAL_ACCESS_TOKEN
             valueFrom:
               secretKeyRef:
                 key: pat
-                name: monitor-secret
+                name: {{ .Values.secrets }}
         resources:
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
+          {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config-map
           configMap:
-            name: monitor-config
+            name: {{ .Values.configmap }}
       

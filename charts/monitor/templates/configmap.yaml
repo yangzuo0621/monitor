@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: monitor-config
+  name: {{ .Values.configmap }}
 data:
   config.json: |-
     {
