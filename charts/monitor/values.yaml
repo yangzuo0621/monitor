@@ -17,6 +17,8 @@ env:
 azureStorageAccount: ""
 azureCICDContainer: ""
 
+repositoryURL: ""
+
 configmap: cicd-monitor-config
 secrets: cicd-monitor-secrets
 
