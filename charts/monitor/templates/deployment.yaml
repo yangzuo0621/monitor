@@ -35,6 +35,8 @@ spec:
               secretKeyRef:
                 key: pat
                 name: {{ .Values.secrets }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
         volumeMounts:
           - name: git-workdir
             mountPath: /src
