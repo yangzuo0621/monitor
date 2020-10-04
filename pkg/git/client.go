@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	vsts "github.com/microsoft/azure-devops-go-api/azuredevops"
 	vstsgit "github.com/microsoft/azure-devops-go-api/azuredevops/git"
@@ -52,6 +53,14 @@ func (c *gitClient) buildClient(ctx context.Context) (vstsgit.Client, error) {
 	return client, nil
 }
 
+func (c *gitClient) refsHeadBranch(s string) string {
+	s = strings.TrimPrefix(s, "origin/")
+	if !strings.HasPrefix(s, "refs/heads/") {
+		s = fmt.Sprintf("refs/heads/%s", s)
+	}
+	return s
+}
+
 func (c *gitClient) PushNewGitBranch(ctx context.Context) (*vstsgit.GitRef, error) {
 	logger := c.logger.WithFields(logrus.Fields{
 		"action": "pushNewGitBranch",
@@ -65,8 +74,8 @@ func (c *gitClient) PushNewGitBranch(ctx context.Context) (*vstsgit.GitRef, erro
 
 	newObjectID := "0000000000000000000000000000000000000000"
 	oldObjectID := "23efe240e33f426fb3364d71bafcf6ff0a440914"
-	branch := "refs/heads/zuya/test-branch"
-	master := "/refs/heads/zuya/e2e-cluster-verify-handler"
+	branch := c.refsHeadBranch("zuya/test-branch")
+	master := c.refsHeadBranch("zuya/e2e-cluster-verify-handler")
 	isLocked := false
 	resp, err := client.UpdateRef(ctx, vstsgit.UpdateRefArgs{
 		NewRefInfo: &vstsgit.GitRefUpdate{
