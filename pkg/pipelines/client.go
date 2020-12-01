@@ -229,10 +229,15 @@ func (c *pipelineClient) TriggerPipelineBuild(ctx context.Context, pipelineID in
 	return resp, nil
 }
 
-func (c *pipelineClient) QueueBuild(ctx context.Context, pipelineID int, branch string, commitID string, variables map[string]string) (*vstsbuild.Build, error) {
+func (c *pipelineClient) QueueBuildByBranch(
+	ctx context.Context,
+	definitionID int,
+	branch string,
+	variables map[string]string,
+) (*vstsbuild.Build, error) {
 	logger := c.logger.WithFields(logrus.Fields{
-		"action":      "QueueBuild",
-		"pipeline.id": pipelineID,
+		"action":      "QueueBuildByBranch",
+		"pipeline.id": definitionID,
 	})
 
 	buildClient, err := c.buildClient(ctx)
@@ -241,26 +246,60 @@ func (c *pipelineClient) QueueBuild(ctx context.Context, pipelineID int, branch 
 		return nil, err
 	}
 
-	if branch == "" {
-		branch = "refs/heads/master"
+	content, _ := json.Marshal(variables)
+	contentStr := string(content)
+	build, err := buildClient.QueueBuild(ctx, vstsbuild.QueueBuildArgs{
+		Build: &vstsbuild.Build{
+			Definition: &vstsbuild.DefinitionReference{
+				Id: &definitionID,
+			},
+			SourceBranch: &branch,
+			Parameters:   &contentStr,
+		},
+		Project: &c.project,
+	})
+
+	if err != nil {
+		err = fmt.Errorf("queue build %d for branch %s failed: %w", definitionID, branch, err)
+		logger.WithError(err).Error()
+		return nil, err
+	}
+
+	return build, nil
+}
+
+func (c *pipelineClient) QueueBuildByCommit(
+	ctx context.Context,
+	definitionID int,
+	gitCommit string,
+	variables map[string]string,
+) (*vstsbuild.Build, error) {
+	logger := c.logger.WithFields(logrus.Fields{
+		"action":      "QueueBuildByCommit",
+		"pipeline.id": definitionID,
+	})
+
+	buildClient, err := c.buildClient(ctx)
+	if err != nil {
+		logger.WithError(err).Error()
+		return nil, err
 	}
 
 	content, _ := json.Marshal(variables)
 	contentStr := string(content)
-
 	build, err := buildClient.QueueBuild(ctx, vstsbuild.QueueBuildArgs{
 		Build: &vstsbuild.Build{
 			Definition: &vstsbuild.DefinitionReference{
-				Id: &pipelineID,
+				Id: &definitionID,
 			},
-			SourceBranch:  &branch,
-			SourceVersion: &commitID,
+			SourceVersion: &gitCommit,
 			Parameters:    &contentStr,
 		},
 		Project: &c.project,
 	})
 
 	if err != nil {
+		err = fmt.Errorf("queue build %d for git commit %s failed: %w", definitionID, gitCommit, err)
 		logger.WithError(err).Error()
 		return nil, err
 	}

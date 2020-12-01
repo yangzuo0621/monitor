@@ -24,8 +24,11 @@ type PipelineClient interface {
 	// TriggerPipelineBuild creates a build intance of specified pipeline.
 	TriggerPipelineBuild(ctx context.Context, pipelineID int, branch string, variables []string) (*vstspipelines.Run, error)
 
-	// QueueBuild creates a build instance of specified pipeline.
-	QueueBuild(ctx context.Context, pipelineID int, branch string, commitID string, variables map[string]string) (*vstsbuild.Build, error)
+	// QueueBuildByBranch creates a build instance of specified pipeline with branch.
+	QueueBuildByBranch(ctx context.Context, pipelineID int, branch string, variables map[string]string) (*vstsbuild.Build, error)
+
+	// QueueBuildByBranch creates a build instance of specified pipeline with git commit.
+	QueueBuildByCommit(ctx context.Context, pipelineID int, gitCommit string, variables map[string]string) (*vstsbuild.Build, error)
 
 	GetArtifactsByBuildID(ctx context.Context, buildID int) (*[]vstsbuild.BuildArtifact, error)
 }

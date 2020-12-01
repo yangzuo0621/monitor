@@ -209,7 +209,7 @@ func (c *MonitorClient) TriggerAKSBuild(ctx context.Context, data *cicd.Data) er
 		bs, _ := json.MarshalIndent(build, "", " ")
 		logger.Infoln(string(bs))
 		variables := make(map[string]string)
-		result, err := pipelineClient.QueueBuild(ctx, c.config.AksBuildID, *build.SourceBranch, *build.SourceVersion, variables)
+		result, err := pipelineClient.QueueBuildByCommit(ctx, c.config.AksBuildID, *build.SourceVersion, variables)
 		if err != nil {
 			logger.Errorln(err)
 			return err
